@@ -11,3 +11,7 @@
 *.user
 *.apk
 *.aab
+
+# Python virtual environments
+.venv/
+server/ranking_api/.venv/
