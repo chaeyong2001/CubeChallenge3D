@@ -5,6 +5,7 @@
 [Bb]uilds/
 [Ll]ogs/
 [Uu]ser[Ss]ettings/
+
 .vs/
 *.csproj
 *.sln
@@ -15,3 +16,11 @@
 # Python virtual environments
 .venv/
 server/ranking_api/.venv/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Local server DB / env
+server/ranking_api/*.db
+server/ranking_api/.env
