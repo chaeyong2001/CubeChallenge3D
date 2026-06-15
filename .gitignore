@@ -24,3 +24,7 @@ __pycache__/
 # Local server DB / env
 server/ranking_api/*.db
 server/ranking_api/.env
+
+# Local Unity/editor scratch and duplicate backups
+.utmp/
+Backups/

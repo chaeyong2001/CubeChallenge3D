@@ -12,6 +12,12 @@ namespace CubeChallenge3D.Cube.Input
         [SerializeField] private float orbitSensitivity = 0.25f;
         [Tooltip("Pointer movement required before orbiting starts.")]
         [SerializeField] private float minDragDistance = 8f;
+        [Header("Pinch Zoom")]
+        [SerializeField] private float portraitBaseScale = 0.72f;
+        [SerializeField] private float landscapeBaseScale = 0.94f;
+        [SerializeField] private float pinchSensitivity = 0.0025f;
+        [SerializeField] private float minimumZoom = 0.62f;
+        [SerializeField] private float maximumZoom = 1.45f;
         [SerializeField] private float snapDuration = 0.25f;
         [SerializeField] private CubeInteractionMode interactionMode = CubeInteractionMode.View;
 
@@ -22,6 +28,10 @@ namespace CubeChallenge3D.Cube.Input
         private bool touchThresholdReached;
         private Vector2 mouseDragStart;
         private Vector2 touchDragStart;
+        private float pinchStartDistance;
+        private float pinchStartZoom = 1f;
+        private float zoom = 1f;
+        private bool pinchActive;
 
         public CubeInteractionMode InteractionMode => interactionMode;
         public CubeInteractionMode CurrentMode => interactionMode;
@@ -29,6 +39,7 @@ namespace CubeChallenge3D.Cube.Input
         public bool IsDraggingView => mouseDragging || touchDragging;
         public float OrbitSensitivity => orbitSensitivity;
         public float MinDragDistance => minDragDistance;
+        public float Zoom => zoom;
 
         public void SetOrbitSensitivity(float sensitivity)
         {
@@ -97,11 +108,22 @@ namespace CubeChallenge3D.Cube.Input
         private void Update()
         {
             RefreshViewRoot();
+            if (controller == null || viewRoot == null)
+            {
+                ResetDragState();
+                return;
+            }
+
+            ApplyViewScale();
+            if (!IsSnapping && !controller.IsBusy && HandlePinchZoom())
+            {
+                ResetSinglePointerDrag();
+                return;
+            }
+
             if (interactionMode != CubeInteractionMode.View
                 || IsSnapping
-                || controller == null
-                || controller.IsBusy
-                || viewRoot == null)
+                || controller.IsBusy)
             {
                 ResetDragState();
                 return;
@@ -202,10 +224,92 @@ namespace CubeChallenge3D.Cube.Input
 
         private void ResetDragState()
         {
+            ResetSinglePointerDrag();
+            pinchActive = false;
+        }
+
+        private void ResetSinglePointerDrag()
+        {
             mouseDragging = false;
             touchDragging = false;
             mouseThresholdReached = false;
             touchThresholdReached = false;
+        }
+
+        private bool HandlePinchZoom()
+        {
+            Touchscreen touchscreen = Touchscreen.current;
+            if (touchscreen == null)
+            {
+                pinchActive = false;
+                return false;
+            }
+
+            Vector2 first = Vector2.zero;
+            Vector2 second = Vector2.zero;
+            int count = 0;
+            foreach (var touch in touchscreen.touches)
+            {
+                if (!touch.press.isPressed)
+                {
+                    continue;
+                }
+
+                if (count == 0)
+                {
+                    first = touch.position.ReadValue();
+                }
+                else if (count == 1)
+                {
+                    second = touch.position.ReadValue();
+                }
+
+                count++;
+                if (count >= 2)
+                {
+                    break;
+                }
+            }
+
+            if (count < 2)
+            {
+                pinchActive = false;
+                return false;
+            }
+
+            if (PointerUIUtility.IsScreenPositionOverUi(first)
+                || PointerUIUtility.IsScreenPositionOverUi(second))
+            {
+                pinchActive = false;
+                return true;
+            }
+
+            float distance = Vector2.Distance(first, second);
+            if (!pinchActive)
+            {
+                pinchActive = true;
+                pinchStartDistance = distance;
+                pinchStartZoom = zoom;
+                return true;
+            }
+
+            zoom = Mathf.Clamp(
+                pinchStartZoom + (distance - pinchStartDistance) * pinchSensitivity,
+                minimumZoom,
+                maximumZoom);
+            ApplyViewScale();
+            return true;
+        }
+
+        private void ApplyViewScale()
+        {
+            if (viewRoot == null)
+            {
+                return;
+            }
+
+            float baseScale = Screen.height >= Screen.width ? portraitBaseScale : landscapeBaseScale;
+            viewRoot.localScale = Vector3.one * (baseScale * zoom);
         }
 
         private IEnumerator SnapToSolveMode()
@@ -235,7 +339,12 @@ namespace CubeChallenge3D.Cube.Input
         {
             if (controller != null && controller.ViewRoot != null)
             {
+                bool changed = viewRoot != controller.ViewRoot;
                 viewRoot = controller.ViewRoot;
+                if (changed)
+                {
+                    ApplyViewScale();
+                }
             }
         }
 

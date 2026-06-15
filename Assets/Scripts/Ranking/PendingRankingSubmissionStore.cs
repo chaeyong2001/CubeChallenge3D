@@ -8,6 +8,7 @@ namespace CubeChallenge3D.Ranking
     [Serializable]
     public sealed class PendingRankingSubmissionData
     {
+        public int saveVersion;
         public List<RankingSubmission> submissions = new List<RankingSubmission>();
     }
 
@@ -26,7 +27,9 @@ namespace CubeChallenge3D.Ranking
 
         public void AddPending(RankingSubmission submission)
         {
-            if (submission == null || data.submissions.Any(item => item.submissionId == submission.submissionId))
+            if (submission == null
+                || submission.isDebugClear
+                || data.submissions.Any(item => item.submissionId == submission.submissionId))
             {
                 return;
             }
@@ -87,12 +90,24 @@ namespace CubeChallenge3D.Ranking
         public void Load()
         {
             data = SaveService.LoadJson(FileName, new PendingRankingSubmissionData());
-            if (data.submissions == null)
+            bool changed = data.saveVersion < SaveDataValidator.CurrentSaveVersion;
+            data.saveVersion = SaveDataValidator.CurrentSaveVersion;
+            int originalCount = data.submissions?.Count ?? 0;
+            data.submissions = (data.submissions ?? new List<RankingSubmission>())
+                .Where(item => item != null && !item.isDebugClear && !string.IsNullOrWhiteSpace(item.submissionId))
+                .GroupBy(item => item.submissionId)
+                .Select(group => group.OrderByDescending(item => item.completedAtUtc).First())
+                .ToList();
+            foreach (RankingSubmission submission in data.submissions.Where(item => string.IsNullOrWhiteSpace(item.syncStatus)))
             {
-                data.submissions = new List<RankingSubmission>();
+                submission.syncStatus = RankingSyncStatus.Pending;
+                changed = true;
             }
-
             Trim();
+            if (changed || data.submissions.Count != originalCount)
+            {
+                Save();
+            }
         }
 
         public void Save()

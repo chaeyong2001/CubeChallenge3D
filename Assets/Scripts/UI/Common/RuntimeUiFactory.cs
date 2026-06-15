@@ -27,7 +27,27 @@ namespace CubeChallenge3D.UI.Common
             scaler.referenceResolution = new Vector2(1080f, 1920f);
             scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
             scaler.matchWidthOrHeight = 0.5f;
+            if (ShouldShowCurrencyBar(name))
+            {
+                TopCurrencyBar.Attach(canvas);
+            }
             return canvas;
+        }
+
+        private static bool ShouldShowCurrencyBar(string canvasName)
+        {
+            if (string.IsNullOrEmpty(canvasName) || canvasName == "Canvas")
+            {
+                return false;
+            }
+
+            return !canvasName.Contains("Modal")
+                && !canvasName.Contains("Popup")
+                && !canvasName.Contains("Utility")
+                && !canvasName.Contains("Mobile")
+                && !canvasName.Contains("Diagnostics")
+                && !canvasName.Contains("Help")
+                && !canvasName.Contains("Playback");
         }
 
         public static RectTransform CreatePanel(
@@ -65,6 +85,9 @@ namespace CubeChallenge3D.UI.Common
 
             Button button = buttonObject.GetComponent<Button>();
             Text text = CreateText(rect, "Label", label, 28, TextAnchor.MiddleCenter);
+            text.resizeTextForBestFit = true;
+            text.resizeTextMinSize = 14;
+            text.resizeTextMaxSize = 28;
             RectTransform textRect = text.rectTransform;
             textRect.anchorMin = Vector2.zero;
             textRect.anchorMax = Vector2.one;
@@ -95,6 +118,9 @@ namespace CubeChallenge3D.UI.Common
             text.fontSize = fontSize;
             text.color = Color.white;
             text.alignment = alignment;
+            text.horizontalOverflow = HorizontalWrapMode.Wrap;
+            text.verticalOverflow = VerticalWrapMode.Truncate;
+            text.lineSpacing = 1f;
             text.raycastTarget = false;
             return text;
         }

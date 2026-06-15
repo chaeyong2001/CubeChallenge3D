@@ -17,19 +17,43 @@ namespace CubeChallenge3D.Save
         public AppSettings Load()
         {
             Current = SaveService.LoadJson(FileName, AppSettings.CreateDefault());
+            bool changed = false;
             if (Current == null)
             {
                 Current = AppSettings.CreateDefault();
+                changed = true;
+            }
+            if (Current.saveVersion < SaveDataValidator.CurrentSaveVersion)
+            {
+                Current.saveVersion = SaveDataValidator.CurrentSaveVersion;
+                changed = true;
             }
 
             if (string.IsNullOrWhiteSpace(Current.playerName))
             {
                 Current.playerName = "Player";
+                changed = true;
+            }
+
+            if (Current.rankingRequestTimeoutSeconds <= 0)
+            {
+                Current.rankingRequestTimeoutSeconds = 8;
+                changed = true;
+            }
+
+            if (Current.rankingApiBaseUrl == null)
+            {
+                Current.rankingApiBaseUrl = string.Empty;
+                changed = true;
             }
 
             if (string.IsNullOrWhiteSpace(Current.playerId))
             {
                 Current.playerId = Guid.NewGuid().ToString();
+                changed = true;
+            }
+            if (changed)
+            {
                 Save();
             }
 

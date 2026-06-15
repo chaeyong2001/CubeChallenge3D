@@ -16,6 +16,7 @@ namespace CubeChallenge3D.Ranking
     [Serializable]
     public sealed class CachedRankingData
     {
+        public int saveVersion;
         public List<CachedRankingEntry> entries = new List<CachedRankingEntry>();
     }
 
@@ -62,9 +63,23 @@ namespace CubeChallenge3D.Ranking
         public void Load()
         {
             data = SaveService.LoadJson(FileName, new CachedRankingData());
-            if (data.entries == null)
+            bool changed = data.saveVersion < SaveDataValidator.CurrentSaveVersion;
+            data.saveVersion = SaveDataValidator.CurrentSaveVersion;
+            List<CachedRankingEntry> source = data.entries ?? new List<CachedRankingEntry>();
+            data.entries = source
+                .Where(entry => entry != null && !string.IsNullOrWhiteSpace(entry.challengeId))
+                .GroupBy(entry => entry.challengeId)
+                .Select(group => group.OrderByDescending(entry => entry.fetchedAtUtc).First())
+                .ToList();
+            foreach (CachedRankingEntry entry in data.entries)
             {
-                data.entries = new List<CachedRankingEntry>();
+                entry.topList = (entry.topList ?? new List<RankingSubmission>())
+                    .Where(item => item != null)
+                    .ToList();
+            }
+            if (changed || data.entries.Count != source.Count)
+            {
+                Save();
             }
         }
 

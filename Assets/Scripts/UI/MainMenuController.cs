@@ -1,6 +1,12 @@
 using CubeChallenge3D.Core;
 using CubeChallenge3D.UI.Common;
+using CubeChallenge3D.UI.Learn;
+using CubeChallenge3D.UI.Records;
+using CubeChallenge3D.UI.Rewards;
 using CubeChallenge3D.UI.Settings;
+using CubeChallenge3D.UI.Shop;
+using CubeChallenge3D.UI.Solver;
+using CubeChallenge3D.UI.Stages;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -10,16 +16,74 @@ namespace CubeChallenge3D.UI
     {
         private ModalPanel comingSoonPanel;
         private SettingsPanelUI settingsPanel;
+        private StageListPanelUI stageListPanel;
+        private ShopPanelUI shopPanel;
+        private RewardsPanelUI rewardsPanel;
+        private SolverPanelUI solverPanel;
+        private LearnModeHubView learnHub;
+        private RecordsPanelUI recordsPanel;
+        private Canvas mainMenuCanvas;
+        private GraphicRaycaster mainMenuRaycaster;
 
-        public void Initialize(ModalPanel modal, SettingsPanelUI settings)
+        public void Initialize(
+            ModalPanel modal,
+            SettingsPanelUI settings,
+            StageListPanelUI stages,
+            ShopPanelUI shop,
+            RewardsPanelUI rewards,
+            SolverPanelUI solver,
+            LearnModeHubView hub,
+            RecordsPanelUI records)
         {
             comingSoonPanel = modal;
             settingsPanel = settings;
+            stageListPanel = stages;
+            shopPanel = shop;
+            rewardsPanel = rewards;
+            solverPanel = solver;
+            learnHub = hub;
+            recordsPanel = records;
+        }
+
+        public void SetMainMenuCanvas(Canvas canvas)
+        {
+            mainMenuCanvas = canvas;
+            mainMenuRaycaster = canvas != null ? canvas.GetComponent<GraphicRaycaster>() : null;
         }
 
         private void Start()
         {
             GameManager.Instance?.SetState(AppState.MainMenu);
+        }
+
+        private void LateUpdate()
+        {
+            if (mainMenuCanvas == null)
+            {
+                return;
+            }
+
+            bool overlayOpen = false;
+            foreach (Transform child in transform)
+            {
+                if (child == mainMenuCanvas.transform)
+                {
+                    continue;
+                }
+
+                Canvas childCanvas = child.GetComponent<Canvas>();
+                if (childCanvas != null && child.gameObject.activeInHierarchy)
+                {
+                    overlayOpen = true;
+                    break;
+                }
+            }
+
+            mainMenuCanvas.enabled = !overlayOpen;
+            if (mainMenuRaycaster != null)
+            {
+                mainMenuRaycaster.enabled = !overlayOpen;
+            }
         }
 
         public void Play()
@@ -36,17 +100,32 @@ namespace CubeChallenge3D.UI
 
         public void Stages()
         {
-            ShowComingSoon("Stages", "Solve Stage and Target Stage.");
+            stageListPanel?.Show();
+        }
+
+        public void Stages(string focusStageId)
+        {
+            stageListPanel?.Show(focusStageId);
         }
 
         public void SolverLearn()
         {
-            ShowComingSoon("Solver / Learn", "Learn basics and manual solver.");
+            learnHub?.Show();
         }
 
         public void Records()
         {
-            ShowComingSoon("Records", "Recent records screen is coming soon.");
+            recordsPanel?.Show();
+        }
+
+        public void Shop()
+        {
+            shopPanel?.Show();
+        }
+
+        public void Rewards()
+        {
+            rewardsPanel?.Show();
         }
 
         public void Settings()
@@ -61,18 +140,20 @@ namespace CubeChallenge3D.UI
         }
 
         public void ApplyLocalizedLabels(
-            Button quickPlay,
             Button rankingChallenge,
             Button stages,
             Button solverLearn,
             Button records,
+            Button shop,
+            Button rewards,
             Button settings)
         {
-            SetButtonLabel(quickPlay, "quick_play");
             SetButtonLabel(rankingChallenge, "ranking_challenge");
             SetButtonLabel(stages, "stages");
             SetButtonLabel(solverLearn, "solver_learn");
             SetButtonLabel(records, "records");
+            SetButtonLabel(shop, "shop");
+            SetButtonLabel(rewards, "rewards");
             SetButtonLabel(settings, "settings");
         }
 
@@ -83,7 +164,7 @@ namespace CubeChallenge3D.UI
                 return;
             }
 
-            Text label = button.GetComponentInChildren<Text>();
+            Text label = button.transform.Find("Label")?.GetComponent<Text>();
             if (label != null)
             {
                 label.text = LocalizationManager.Instance != null ? LocalizationManager.Instance.GetText(key) : key;

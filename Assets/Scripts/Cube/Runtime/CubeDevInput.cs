@@ -3,6 +3,7 @@ using CubeChallenge3D.Cube.Debugging;
 using CubeChallenge3D.Cube.Input;
 using CubeChallenge3D.GameModes.QuickPlay;
 using CubeChallenge3D.GameModes.RankingChallenge;
+using CubeChallenge3D.GameModes.Stages;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -16,6 +17,8 @@ namespace CubeChallenge3D.Cube.Runtime
         [SerializeField] private CubeControlModeController controlModeController;
         [SerializeField] private QuickPlayGameMode quickPlay;
         [SerializeField] private RankingChallengeGameMode rankingChallenge;
+        [SerializeField] private StagePlayGameMode stagePlay;
+        [SerializeField] private bool allowUndo = true;
 
         public void Initialize(
             CubeController cubeController,
@@ -23,7 +26,9 @@ namespace CubeChallenge3D.Cube.Runtime
             CubeViewOrbitController viewOrbitController,
             CubeControlModeController controlController,
             QuickPlayGameMode quickPlayGameMode,
-            RankingChallengeGameMode rankingChallengeGameMode = null)
+            RankingChallengeGameMode rankingChallengeGameMode = null,
+            StagePlayGameMode stagePlayGameMode = null,
+            bool enableUndo = true)
         {
             controller = cubeController;
             diagnostics = runtimeDiagnostics;
@@ -31,6 +36,8 @@ namespace CubeChallenge3D.Cube.Runtime
             controlModeController = controlController;
             quickPlay = quickPlayGameMode;
             rankingChallenge = rankingChallengeGameMode;
+            stagePlay = stagePlayGameMode;
+            allowUndo = enableUndo;
         }
 
         private void Update()
@@ -60,11 +67,17 @@ namespace CubeChallenge3D.Cube.Runtime
                 return;
             }
 
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            // DEV force clear must never be available in release builds.
             if (keyboard.yKey.wasPressedThisFrame)
             {
                 if (quickPlay != null)
                 {
                     quickPlay.ForceClearForDebug();
+                }
+                else if (stagePlay != null)
+                {
+                    stagePlay.ForceClearForDebug();
                 }
                 else
                 {
@@ -73,6 +86,7 @@ namespace CubeChallenge3D.Cube.Runtime
 
                 return;
             }
+#endif
 
             if (keyboard.mKey.wasPressedThisFrame || keyboard.spaceKey.wasPressedThisFrame)
             {
@@ -128,7 +142,7 @@ namespace CubeChallenge3D.Cube.Runtime
                 return;
             }
 
-            if (keyboard.zKey.wasPressedThisFrame || keyboard.backspaceKey.wasPressedThisFrame)
+            if (allowUndo && (keyboard.zKey.wasPressedThisFrame || keyboard.backspaceKey.wasPressedThisFrame))
             {
                 controller.Undo();
                 return;

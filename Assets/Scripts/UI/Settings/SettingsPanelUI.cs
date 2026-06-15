@@ -73,8 +73,16 @@ namespace CubeChallenge3D.UI.Settings
             soundLabel = AddSettingButton(panel, "Sound", new Vector2(0f, 360f), ToggleSound);
             vibrationLabel = AddSettingButton(panel, "Vibration", new Vector2(0f, 260f), ToggleVibration);
             AddStaticLabel(panel, "Language: English", new Vector2(0f, 170f));
+            AddStaticLabel(panel, $"Version {Application.version}", new Vector2(0f, 110f));
 
-            Button close = RuntimeUiFactory.CreateButton(panel, "CloseButton", "Close", new Vector2(0f, 40f), new Vector2(340f, 72f));
+#if !UNITY_EDITOR && !DEVELOPMENT_BUILD
+            if (debugLabel != null)
+            {
+                debugLabel.transform.parent.gameObject.SetActive(false);
+            }
+#endif
+
+            Button close = RuntimeUiFactory.CreateButton(panel, "CloseButton", "Back", new Vector2(0f, 28f), new Vector2(340f, 68f));
             close.onClick.AddListener(Hide);
             Hide();
         }

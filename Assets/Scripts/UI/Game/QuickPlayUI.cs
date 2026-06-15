@@ -1,5 +1,6 @@
 using CubeChallenge3D.GameModes.QuickPlay;
 using CubeChallenge3D.Cube.Debugging;
+using CubeChallenge3D.UI.Common;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
@@ -16,7 +17,7 @@ namespace CubeChallenge3D.UI.Game
         [SerializeField] private bool hideQuickPlayPanelsWhileResult = true;
 
         [Header("Adjustable Layout")]
-        [SerializeField] private Vector2 hudPosition = new Vector2(0f, -40f);
+        [SerializeField] private Vector2 hudPosition = new Vector2(0f, -82f);
         [SerializeField] private Vector2 hudSize = new Vector2(560f, 310f);
         [SerializeField] private Vector2 hudMinSize = new Vector2(420f, 250f);
         [SerializeField] private Vector2 hudMaxSize = new Vector2(760f, 420f);
@@ -82,11 +83,12 @@ namespace CubeChallenge3D.UI.Game
             scaler.referenceResolution = new Vector2(1080f, 1920f);
             scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
             scaler.matchWidthOrHeight = 0.5f;
+            TopCurrencyBar.Attach(canvas);
 
             RectTransform hud = CreatePanel(canvasObject.transform, "QuickPlayHUD", new Vector2(0.5f, 1f),
                 new Vector2(0.5f, 1f), hudPosition, hudSize);
             hudPanel = hud.gameObject;
-            CreateWindowBar(hud, "Status", hudMinSize, hudMaxSize, true, true);
+            CreateWindowBar(hud, "Practice", hudMinSize, hudMaxSize, true, true);
             statusText = CreateText(hud, "StatusValue", new Vector2(0f, -60f), 34);
             timerText = CreateText(hud, "Timer", new Vector2(0f, -112f), 42);
             moveText = CreateText(hud, "Moves", new Vector2(0f, -170f), 30);
@@ -123,7 +125,7 @@ namespace CubeChallenge3D.UI.Game
                 return;
             }
 
-            statusText.text = gameMode.State.ToString();
+            statusText.text = $"Practice  |  {gameMode.State}\n{UIStrings.NoHeartsRequired}";
             timerText.text = $"Time  {FormatTime(gameMode.ElapsedTime)}";
             moveText.text = $"Moves  {gameMode.MoveCount}";
             bestText.text = BuildBestSummary();

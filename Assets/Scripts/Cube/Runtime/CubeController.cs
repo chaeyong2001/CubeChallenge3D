@@ -51,6 +51,24 @@ namespace CubeChallenge3D.Cube.Runtime
             ResetSolvedInternal(true);
         }
 
+        public void SetStateInstant(CubeState state, bool clearHistory = true)
+        {
+            if (IsBusy || state == null)
+            {
+                return;
+            }
+
+            EnsureVisualBuilder();
+            CurrentState = state.Clone();
+            visualBuilder.Build(CurrentState);
+            if (clearHistory)
+            {
+                moveHistory.Clear();
+                LastMove = null;
+                NotifyMoveCountChanged();
+            }
+        }
+
         public void ApplyUserMove(CubeMove move)
         {
             if (!UserInputEnabled || IsBusy || CurrentState == null)
@@ -107,6 +125,19 @@ namespace CubeChallenge3D.Cube.Runtime
         public void SetUserInputEnabled(bool enabled)
         {
             UserInputEnabled = enabled;
+        }
+
+        public void SetRotationDuration(float seconds)
+        {
+            rotationDuration = Mathf.Max(0.01f, seconds);
+        }
+
+        public void SetViewVisible(bool visible)
+        {
+            if (ViewRoot != null)
+            {
+                ViewRoot.gameObject.SetActive(visible);
+            }
         }
 
         public void ReplayMoves(IEnumerable<CubeMove> moves)

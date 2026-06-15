@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using CubeChallenge3D.Cube.Model;
+using CubeChallenge3D.Economy;
 using UnityEngine;
 using Object = UnityEngine.Object;
 
@@ -30,12 +31,20 @@ namespace CubeChallenge3D.Cube.View
 
         private readonly Dictionary<CubeColor, Material> runtimeMaterials = new Dictionary<CubeColor, Material>();
         private Material runtimeBodyMaterial;
+        private CubeSkinData activeSkin;
+        private CubeSkinData previewSkinOverride;
         private Transform viewRoot;
         private Transform cubeRoot;
 
         public Transform ViewRoot => viewRoot;
         public Transform CubeRoot => cubeRoot;
         public float CubieSpacing => cubieSize + gap;
+
+        public void SetPreviewSkin(CubeSkinData skin)
+        {
+            previewSkinOverride = skin;
+            activeSkin = null;
+        }
 
         public void Build(CubeState state)
         {
@@ -44,6 +53,7 @@ namespace CubeChallenge3D.Cube.View
                 throw new ArgumentNullException(nameof(state));
             }
 
+            EnsureVisualStyle();
             Clear();
             EnsureViewRoot();
             cubeRoot = new GameObject(CubeRootName).transform;
@@ -117,14 +127,15 @@ namespace CubeChallenge3D.Cube.View
 
         private void CreateCubie(CubeState state, Vector3Int gridPosition)
         {
-            GameObject cubie = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            cubie.name = $"Cubie_{gridPosition.x}_{gridPosition.y}_{gridPosition.z}";
+            GameObject cubie = RuntimePrimitiveFactory.CreateCube(
+                $"Cubie_{gridPosition.x}_{gridPosition.y}_{gridPosition.z}");
             cubie.transform.SetParent(cubeRoot, false);
 
             float spacing = cubieSize + gap;
             cubie.transform.localPosition = (Vector3)gridPosition * spacing;
             cubie.transform.localScale = Vector3.one * cubieSize;
             cubie.GetComponent<MeshRenderer>().sharedMaterial = GetBodyMaterial();
+            cubie.AddComponent<BoxCollider>();
             cubie.AddComponent<CubieVisual>().Initialize(gridPosition);
 
             if (gridPosition.y == 1) CreateSticker(state, cubie.transform, gridPosition, CubeFace.Up);
@@ -139,8 +150,7 @@ namespace CubeChallenge3D.Cube.View
         {
             CubeFaceletMapping.GridPositionToFacelet(face, gridPosition, out int row, out int col);
 
-            GameObject sticker = GameObject.CreatePrimitive(PrimitiveType.Quad);
-            sticker.name = $"Sticker_{face}";
+            GameObject sticker = RuntimePrimitiveFactory.CreateQuad($"Sticker_{face}");
             sticker.transform.SetParent(cubie, false);
             sticker.transform.localPosition = CubeFaceletMapping.FaceNormal(face) * (0.5f + stickerOffset);
             sticker.transform.localRotation = CubeFaceletMapping.StickerRotation(face);
@@ -150,11 +160,6 @@ namespace CubeChallenge3D.Cube.View
             sticker.GetComponent<MeshRenderer>().sharedMaterial = GetColorMaterial(color);
             sticker.AddComponent<StickerVisual>().Initialize(face, row, col);
 
-            Collider collider = sticker.GetComponent<Collider>();
-            if (collider != null)
-            {
-                Destroy(collider);
-            }
         }
 
         private Material GetBodyMaterial()
@@ -166,7 +171,10 @@ namespace CubeChallenge3D.Cube.View
 
             if (runtimeBodyMaterial == null)
             {
-                runtimeBodyMaterial = CreateRuntimeMaterial(new Color(0.025f, 0.03f, 0.035f));
+                runtimeBodyMaterial = CreateRuntimeMaterial(
+                    activeSkin != null ? activeSkin.bodyColor : new Color(0.025f, 0.03f, 0.035f),
+                    activeSkin,
+                    CubeColor.None);
                 runtimeBodyMaterial.name = "Runtime_CubeBody";
             }
 
@@ -183,7 +191,10 @@ namespace CubeChallenge3D.Cube.View
 
             if (!runtimeMaterials.TryGetValue(color, out Material material))
             {
-                material = CreateRuntimeMaterial(GetDisplayColor(color));
+                material = CreateRuntimeMaterial(
+                    activeSkin != null ? activeSkin.GetColor(color) : GetDisplayColor(color),
+                    activeSkin,
+                    color);
                 material.name = $"Runtime_Sticker_{color}";
                 runtimeMaterials[color] = material;
             }
@@ -205,16 +216,86 @@ namespace CubeChallenge3D.Cube.View
             }
         }
 
-        private static Material CreateRuntimeMaterial(Color color)
+        private static Material CreateRuntimeMaterial(Color color, CubeSkinData skin, CubeColor stickerColor)
         {
-            Shader shader = Shader.Find("Universal Render Pipeline/Lit");
+            Shader shader = Resources.Load<Shader>("RuntimeColor");
+            if (shader == null)
+            {
+                shader = Shader.Find("Universal Render Pipeline/Lit");
+            }
             if (shader == null)
             {
                 shader = Shader.Find("Standard");
             }
+            if (shader == null)
+            {
+                shader = Shader.Find("Sprites/Default");
+            }
 
             var material = new Material(shader);
-            material.color = color;
+            Color materialColor = skin != null && stickerColor != CubeColor.None
+                ? Color.Lerp(color, Color.white, Mathf.Clamp01(skin.textureVisibility))
+                : color;
+            material.color = materialColor;
+            if (material.HasProperty("_BaseColor"))
+            {
+                material.SetColor("_BaseColor", materialColor);
+            }
+            if (stickerColor != CubeColor.None && material.HasProperty("_Cull"))
+            {
+                material.SetFloat("_Cull", (float)UnityEngine.Rendering.CullMode.Off);
+            }
+
+            if (skin == null)
+            {
+                return material;
+            }
+
+            string texturePath = stickerColor == CubeColor.None
+                ? skin.textureResourcePath
+                : skin.GetStickerTexturePath(stickerColor);
+            if (!string.IsNullOrWhiteSpace(texturePath))
+            {
+                Texture2D texture = Resources.Load<Texture2D>(texturePath);
+                if (texture != null)
+                {
+                    texture.wrapMode = string.IsNullOrWhiteSpace(skin.stickerTextureRoot)
+                        ? TextureWrapMode.Repeat
+                        : TextureWrapMode.Clamp;
+                    material.mainTexture = texture;
+                    material.mainTextureScale = Vector2.one * Mathf.Max(0.1f, skin.textureScale);
+                    material.mainTextureOffset = Vector2.zero;
+                    if (material.HasProperty("_BaseMap"))
+                    {
+                        material.SetTexture("_BaseMap", texture);
+                        material.SetTextureScale("_BaseMap", Vector2.one * Mathf.Max(0.1f, skin.textureScale));
+                        material.SetTextureOffset("_BaseMap", Vector2.zero);
+                    }
+
+                    if (skin.useTextureEmission && material.HasProperty("_EmissionMap"))
+                    {
+                        material.SetTexture("_EmissionMap", texture);
+                    }
+                }
+            }
+
+            if (material.HasProperty("_Metallic"))
+            {
+                material.SetFloat("_Metallic", Mathf.Clamp01(skin.metallic));
+            }
+            if (material.HasProperty("_Smoothness"))
+            {
+                material.SetFloat("_Smoothness", Mathf.Clamp01(skin.smoothness));
+            }
+            if (skin.emissionStrength > 0f && material.HasProperty("_EmissionColor"))
+            {
+                material.EnableKeyword("_EMISSION");
+                Color emissionColor = skin.useTextureEmission
+                    ? Color.white * skin.emissionStrength
+                    : color * skin.emissionStrength;
+                material.SetColor("_EmissionColor", emissionColor);
+                material.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
+            }
             return material;
         }
 
@@ -230,6 +311,24 @@ namespace CubeChallenge3D.Cube.View
                 case CubeColor.Orange: return new Color(1f, 0.35f, 0.03f);
                 default: return Color.magenta;
             }
+        }
+
+        private void EnsureVisualStyle()
+        {
+            CubeSkinData selected = previewSkinOverride ?? VisualCustomizationService.LoadSelectedSkin();
+            if (activeSkin != null && selected != null && activeSkin.skinId == selected.skinId)
+            {
+                return;
+            }
+
+            DestroyRuntimeMaterial(runtimeBodyMaterial);
+            runtimeBodyMaterial = null;
+            foreach (Material material in runtimeMaterials.Values)
+            {
+                DestroyRuntimeMaterial(material);
+            }
+            runtimeMaterials.Clear();
+            activeSkin = selected;
         }
 
         private void OnDestroy()

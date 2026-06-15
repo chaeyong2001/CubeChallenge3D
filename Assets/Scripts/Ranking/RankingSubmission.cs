@@ -18,6 +18,8 @@ namespace CubeChallenge3D.Ranking
         public bool completed;
         public bool isVerified;
         public bool isSynced;
+        public bool isDebugClear;
+        public string clearSource;
         public string syncStatus;
         public string clientVersion;
         public string deviceIdHash;
@@ -47,6 +49,8 @@ namespace CubeChallenge3D.Ranking
                 completed = true,
                 isVerified = false,
                 isSynced = false,
+                isDebugClear = false,
+                clearSource = "Normal",
                 syncStatus = RankingSyncStatus.LocalOnly,
                 clientVersion = "local",
                 deviceIdHash = string.IsNullOrWhiteSpace(playerId) ? string.Empty : playerId

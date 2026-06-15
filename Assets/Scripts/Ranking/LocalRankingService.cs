@@ -8,7 +8,6 @@ namespace CubeChallenge3D.Ranking
     {
         private readonly LocalRankingStore store;
         private readonly CachedRankingStore cacheStore;
-        private readonly PendingRankingSubmissionStore pendingStore;
 
         public LocalRankingService(
             LocalRankingStore rankingStore,
@@ -17,19 +16,23 @@ namespace CubeChallenge3D.Ranking
         {
             store = rankingStore;
             cacheStore = cachedStore ?? new CachedRankingStore();
-            pendingStore = pendingSubmissionStore ?? new PendingRankingSubmissionStore();
         }
 
         public Task<RankingSubmitResult> SubmitAsync(RankingSubmission submission)
         {
-            if (submission == null || !submission.isVerified)
+            if (submission == null || !submission.isVerified || submission.isDebugClear)
             {
                 if (submission != null)
                 {
-                    submission.syncStatus = RankingSyncStatus.Rejected;
+                    submission.syncStatus = submission.isDebugClear
+                        ? RankingSyncStatus.LocalOnly
+                        : RankingSyncStatus.Rejected;
                 }
 
-                return Task.FromResult(RankingSubmitResult.Rejected(submission, "Rejected by local verification."));
+                string message = submission != null && submission.isDebugClear
+                    ? "DEV clear - not submitted"
+                    : "Rejected by local verification.";
+                return Task.FromResult(RankingSubmitResult.Rejected(submission, message));
             }
 
             submission.syncStatus = RankingSyncStatus.LocalOnly;
@@ -64,12 +67,7 @@ namespace CubeChallenge3D.Ranking
 
         public Task RetryPendingAsync()
         {
-            // Network submission is intentionally not implemented in 7-B.
-            foreach (RankingSubmission submission in pendingStore.GetPending())
-            {
-                pendingStore.MarkFailed(submission.submissionId, "Server service is not connected.");
-            }
-
+            // Local mode does not mark pending records as failed.
             return Task.CompletedTask;
         }
     }

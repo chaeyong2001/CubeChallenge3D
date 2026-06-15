@@ -1,0 +1,10 @@
+TwoPhaseSolver
+Copyright (c) 2019 William Tremblay
+Source: https://github.com/tremwil/TwoPhaseSolver
+Imported commit: 0f6a2662693cdd4605a8418758a2c542b2afdbed
+License: MIT (see LICENSE.txt)
+
+Project modifications:
+- Binary table loading was adapted from relative filesystem paths to Unity Resources.
+- Precomputed table files are packaged under Assets/Resources/TwoPhaseSolverTables.
+- Console/test project files are not included.

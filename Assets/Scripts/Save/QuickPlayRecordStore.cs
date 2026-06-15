@@ -8,6 +8,7 @@ namespace CubeChallenge3D.Save
     [Serializable]
     public sealed class QuickPlayRecordData
     {
+        public int saveVersion;
         public List<QuickPlayResult> records = new List<QuickPlayResult>();
     }
 
@@ -74,12 +75,20 @@ namespace CubeChallenge3D.Save
         public void Load()
         {
             data = SaveService.LoadJson(FileName, new QuickPlayRecordData());
+            bool changed = data.saveVersion < SaveDataValidator.CurrentSaveVersion;
+            data.saveVersion = SaveDataValidator.CurrentSaveVersion;
             if (data.records == null)
             {
                 data.records = new List<QuickPlayResult>();
+                changed = true;
             }
 
+            int originalCount = data.records.Count;
             SortAndTrim();
+            if (changed || data.records.Count != originalCount)
+            {
+                Save();
+            }
         }
 
         public void Save()

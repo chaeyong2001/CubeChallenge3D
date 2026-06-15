@@ -17,7 +17,7 @@ namespace CubeChallenge3D.Cube.Debugging
         [SerializeField] private CubeViewOrbitController orbitController;
         [SerializeField] private CubeControlModeController controlModeController;
         [SerializeField] private CubeFaceDragInput faceDragInput;
-        [SerializeField] private bool showDebugPanel = true;
+        [SerializeField] private bool showDebugPanel;
         [SerializeField] private float refreshInterval = 0.1f;
         [SerializeField] private Vector2 panelMinSize = new Vector2(320f, 280f);
         [SerializeField] private Vector2 panelMaxSize = new Vector2(760f, 900f);

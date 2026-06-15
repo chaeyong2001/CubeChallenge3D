@@ -1,5 +1,4 @@
 #if UNITY_EDITOR
-using System.Collections.Generic;
 using System.Linq;
 using UnityEditor;
 
@@ -11,10 +10,10 @@ namespace CubeChallenge3D.EditorTools
         private static readonly string[] RequiredScenes =
         {
             "Assets/Scenes/Boot.unity",
-            "Assets/Scenes/MainMenu.unity",
             "Assets/Scenes/Game.unity",
             "Assets/Scenes/Stage.unity",
-            "Assets/Scenes/Solver.unity"
+            "Assets/Scenes/Solver.unity",
+            "Assets/Scenes/MainMenu.unity"
         };
 
         static BuildSceneListBootstrap()
@@ -24,23 +23,16 @@ namespace CubeChallenge3D.EditorTools
 
         private static void EnsureRequiredScenes()
         {
-            List<EditorBuildSettingsScene> scenes = EditorBuildSettings.scenes.ToList();
-            bool changed = false;
-
-            foreach (string path in RequiredScenes)
+            EditorBuildSettingsScene[] expected = RequiredScenes
+                .Select(path => new EditorBuildSettingsScene(path, true))
+                .ToArray();
+            EditorBuildSettingsScene[] current = EditorBuildSettings.scenes;
+            bool matches = current.Length == expected.Length
+                && current.Select(scene => scene.path).SequenceEqual(RequiredScenes)
+                && current.All(scene => scene.enabled);
+            if (!matches)
             {
-                if (scenes.Any(scene => scene.path == path))
-                {
-                    continue;
-                }
-
-                scenes.Add(new EditorBuildSettingsScene(path, true));
-                changed = true;
-            }
-
-            if (changed)
-            {
-                EditorBuildSettings.scenes = scenes.ToArray();
+                EditorBuildSettings.scenes = expected;
             }
         }
     }

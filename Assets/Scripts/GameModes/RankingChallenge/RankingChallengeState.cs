@@ -4,6 +4,7 @@ namespace CubeChallenge3D.GameModes.RankingChallenge
     {
         Ready,
         Scrambling,
+        Previewing,
         Playing,
         Solved
     }

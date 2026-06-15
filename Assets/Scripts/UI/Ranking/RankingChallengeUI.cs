@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Text;
 using CubeChallenge3D.Core;
 using CubeChallenge3D.GameModes.RankingChallenge;
@@ -18,6 +19,7 @@ namespace CubeChallenge3D.UI.Ranking
         private Text resultText;
         private Text rankingText;
         private Button startButton;
+        private Button retrySyncButton;
         private Canvas canvas;
         private readonly Vector2 minPanelSize = new Vector2(620f, 560f);
         private readonly Vector2 maxPanelSize = new Vector2(980f, 980f);
@@ -47,7 +49,7 @@ namespace CubeChallenge3D.UI.Ranking
                 "RankingChallengePanel",
                 new Vector2(0.5f, 1f),
                 new Vector2(0.5f, 1f),
-                new Vector2(0f, -30f),
+                new Vector2(0f, -80f),
                 new Vector2(760f, 700f));
             Image panelImage = panel.GetComponent<Image>();
             if (panelImage != null)
@@ -66,8 +68,11 @@ namespace CubeChallenge3D.UI.Ranking
             rankingText = CreateRow(panel, "Ranking", new Vector2(0f, -330f), 24, 230f);
             rankingText.alignment = TextAnchor.UpperCenter;
 
-            startButton = RuntimeUiFactory.CreateButton(panel, "StartButton", "Start Challenge", new Vector2(0f, 34f), new Vector2(380f, 76f));
-            startButton.onClick.AddListener(() => gameMode?.StartChallenge());
+            retrySyncButton = RuntimeUiFactory.CreateButton(panel, "RetrySyncButton", "Retry Sync", new Vector2(-230f, 34f), new Vector2(260f, 76f));
+            retrySyncButton.onClick.AddListener(() => gameMode?.RetryPendingSubmissions());
+
+            startButton = RuntimeUiFactory.CreateButton(panel, "StartButton", "Start Challenge", new Vector2(150f, 34f), new Vector2(340f, 76f));
+            startButton.onClick.AddListener(() => gameMode?.PrepareChallenge());
         }
 
         private static Text CreateRow(RectTransform parent, string name, Vector2 position, int size, float height)
@@ -133,21 +138,23 @@ namespace CubeChallenge3D.UI.Ranking
             timerText.text = $"Time  {FormatTime(gameMode.ElapsedTime)}";
             moveText.text = $"Moves  {gameMode.MoveCount}";
             resultText.text = gameMode.State == RankingChallengeState.Solved
-                ? gameMode.LastSubmitMessage
-                : $"State  {gameMode.State}";
+                ? FriendlySubmitMessage(gameMode.LastSubmitMessage)
+                : GetStateLabel(gameMode.State);
             startButton.interactable = gameMode.State != RankingChallengeState.Scrambling;
+            retrySyncButton.interactable = gameMode.State != RankingChallengeState.Scrambling;
             rankingText.text = BuildRankingText(config?.challengeId);
         }
 
         private string BuildRankingText(string challengeId)
         {
-            if (string.IsNullOrEmpty(challengeId) || gameMode.LocalRankingStore == null)
+            if (string.IsNullOrEmpty(challengeId) || gameMode.DisplayedRankingRecords == null)
             {
-                return "Local Ranking\n-";
+                return "Local Ranking\nNo records yet.";
             }
 
-            var top = gameMode.LocalRankingStore.GetTopByTime(challengeId, 10);
-            var builder = new StringBuilder("Local Ranking Top 10\n");
+            IReadOnlyList<RankingSubmission> top = gameMode.DisplayedRankingRecords;
+            var builder = new StringBuilder(gameMode.RankingSourceLabel);
+            builder.Append(" Top 10\n");
             if (top.Count == 0)
             {
                 builder.Append("-");
@@ -177,6 +184,41 @@ namespace CubeChallenge3D.UI.Ranking
             }
 
             return builder.ToString();
+        }
+
+        private static string GetStateLabel(RankingChallengeState state)
+        {
+            switch (state)
+            {
+                case RankingChallengeState.Playing:
+                    return "Challenge in progress";
+                case RankingChallengeState.Scrambling:
+                    return "Preparing challenge...";
+                case RankingChallengeState.Previewing:
+                    return "Inspect the scramble, then start.";
+                case RankingChallengeState.Solved:
+                    return "Challenge complete";
+                default:
+                    return "Ready";
+            }
+        }
+
+        private static string FriendlySubmitMessage(string message)
+        {
+            if (string.IsNullOrWhiteSpace(message))
+            {
+                return "Score saved.";
+            }
+            if (message.Contains("Pending") || message.Contains("pending"))
+            {
+                return "Pending sync. Your result will upload later.";
+            }
+            if (message.Contains("failed") || message.Contains("Failed"))
+            {
+                return "Connection failed. Your result is saved locally.";
+            }
+
+            return message;
         }
 
         private static string FormatTime(float seconds)

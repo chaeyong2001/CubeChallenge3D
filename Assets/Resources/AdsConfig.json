@@ -1,0 +1,22 @@
+{
+  "adsEnabled": true,
+  "useMockAdsInEditor": true,
+  "useMockAdsInDevelopmentBuild": true,
+  "useTestAdUnitIds": true,
+  "androidAdMobAppId": "",
+  "iosAdMobAppId": "",
+  "androidRewardedAdUnitIdStageContinue": "",
+  "androidRewardedAdUnitIdDailyCoins": "",
+  "androidRewardedAdUnitIdSolverBonusTicket": "",
+  "iosRewardedAdUnitIdStageContinue": "",
+  "iosRewardedAdUnitIdDailyCoins": "",
+  "iosRewardedAdUnitIdSolverBonusTicket": "",
+  "androidTestRewardedAdUnitId": "ca-app-pub-3940256099942544/5224354917",
+  "iosTestRewardedAdUnitId": "ca-app-pub-3940256099942544/1712485313",
+  "stageContinueMaxPerRun": 2,
+  "stageContinueMovesReward": 2,
+  "dailyCoinAdsMax": 5,
+  "dailyCoinRewardAmount": 100,
+  "dailySolverTicketAdsMax": 1,
+  "solverTicketRewardAmount": 1
+}

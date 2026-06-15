@@ -5,11 +5,15 @@ using CubeChallenge3D.Cube.Debugging;
 using CubeChallenge3D.Cube.Input;
 using CubeChallenge3D.GameModes.QuickPlay;
 using CubeChallenge3D.GameModes.RankingChallenge;
+using CubeChallenge3D.GameModes.Stages;
 using CubeChallenge3D.Ranking;
 using CubeChallenge3D.Save;
+using CubeChallenge3D.Stages.Progress;
+using CubeChallenge3D.Stages.Services;
+using CubeChallenge3D.Stages.Model;
 using CubeChallenge3D.UI.Game;
-using CubeChallenge3D.UI.Ranking;
 using CubeChallenge3D.UI.Settings;
+using CubeChallenge3D.Economy;
 
 namespace CubeChallenge3D.Cube.Runtime
 {
@@ -64,6 +68,7 @@ namespace CubeChallenge3D.Cube.Runtime
             }
 
             controlModeController.Initialize(controller, orbitController, settingsStore);
+            controlModeController.SetDragControlMode();
 
             CubeFaceDragInput faceDragInput = GetComponent<CubeFaceDragInput>();
             if (faceDragInput == null)
@@ -81,9 +86,11 @@ namespace CubeChallenge3D.Cube.Runtime
             }
 
             mobileUi.Initialize(orbitController, controlModeController, controller);
+            mobileUi.SetVisible(false);
 
             QuickPlayGameMode quickPlay = null;
             RankingChallengeGameMode rankingMode = null;
+            StagePlayGameMode stageMode = null;
 
             CubeDevInput devInput = GetComponent<CubeDevInput>();
             if (devInput == null)
@@ -98,7 +105,11 @@ namespace CubeChallenge3D.Cube.Runtime
             }
 
             diagnostics.Initialize(controller, orbitController, controlModeController, faceDragInput);
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
             diagnostics.SetDebugPanelVisible(settingsStore.Current.showDebugPanel);
+#else
+            diagnostics.SetDebugPanelVisible(false);
+#endif
 
             SettingsPanelUI settingsPanel = GetComponent<SettingsPanelUI>();
             if (settingsPanel == null)
@@ -119,13 +130,27 @@ namespace CubeChallenge3D.Cube.Runtime
 
                 rankingMode.Initialize(controller, controlModeController, settingsStore, rankingStore);
 
-                RankingChallengeUI rankingUi = GetComponent<RankingChallengeUI>();
-                if (rankingUi == null)
+            }
+            else if (launchMode == GameLaunchMode.StagePlay)
+            {
+                StageDataLoader stageLoader = new StageDataLoader();
+                StageProgressStore stageProgressStore = new StageProgressStore();
+                stageProgressStore.EnsureStageDefaults(stageLoader.LoadAllStages());
+
+                stageMode = GetComponent<StagePlayGameMode>();
+                if (stageMode == null)
                 {
-                    rankingUi = gameObject.AddComponent<RankingChallengeUI>();
+                    stageMode = gameObject.AddComponent<StagePlayGameMode>();
                 }
 
-                rankingUi.Initialize(rankingMode);
+                stageMode.Initialize(controller, controlModeController, stageLoader, stageProgressStore);
+                StageData stage = stageLoader.GetStageById(GameLaunchContext.StageId);
+                stageMode.LoadStage(stage);
+                if (stage == null || stage.stageType == StageType.SolveStage)
+                {
+                    stageMode.StartStage();
+                }
+
             }
             else
             {
@@ -138,23 +163,24 @@ namespace CubeChallenge3D.Cube.Runtime
 
                 quickPlay.Initialize(controller, controlModeController, recordStore);
 
-                QuickPlayUI quickPlayUi = GetComponent<QuickPlayUI>();
-                if (quickPlayUi == null)
-                {
-                    quickPlayUi = gameObject.AddComponent<QuickPlayUI>();
-                }
-
-                quickPlayUi.Initialize(quickPlay, mobileUi, diagnostics);
             }
 
-            GameUtilityUI utilityUi = GetComponent<GameUtilityUI>();
-            if (utilityUi == null)
+            MobileGameHudUI gameHud = GetComponent<MobileGameHudUI>();
+            if (gameHud == null)
             {
-                utilityUi = gameObject.AddComponent<GameUtilityUI>();
+                gameHud = gameObject.AddComponent<MobileGameHudUI>();
             }
 
-            utilityUi.Initialize(controller, settingsPanel);
-            devInput.Initialize(controller, diagnostics, orbitController, controlModeController, quickPlay, rankingMode);
+            gameHud.Initialize(controller, orbitController, launchMode, quickPlay, rankingMode, stageMode);
+            devInput.Initialize(
+                controller,
+                diagnostics,
+                orbitController,
+                controlModeController,
+                quickPlay,
+                rankingMode,
+                stageMode,
+                launchMode != GameLaunchMode.StagePlay);
             ConfigureCamera();
             EnsureDirectionalLight();
         }
@@ -172,6 +198,13 @@ namespace CubeChallenge3D.Cube.Runtime
 
             mainCamera.transform.position = new Vector3(4f, 4f, -6f);
             mainCamera.transform.LookAt(Vector3.zero);
+            mainCamera.orthographic = false;
+            mainCamera.fieldOfView = 48f;
+            mainCamera.nearClipPlane = 0.1f;
+            mainCamera.farClipPlane = 100f;
+            mainCamera.rect = new Rect(0f, 0f, 1f, 1f);
+            mainCamera.clearFlags = CameraClearFlags.SolidColor;
+            mainCamera.backgroundColor = VisualCustomizationService.LoadSelectedTheme().backgroundColor;
         }
 
         private static void EnsureDirectionalLight()

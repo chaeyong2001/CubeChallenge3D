@@ -8,6 +8,7 @@ namespace CubeChallenge3D.Ranking
     [Serializable]
     public sealed class LocalRankingData
     {
+        public int saveVersion;
         public List<RankingSubmission> submissions = new List<RankingSubmission>();
     }
 
@@ -43,12 +44,7 @@ namespace CubeChallenge3D.Ranking
 
         public IReadOnlyList<RankingSubmission> GetTopByTime(string challengeId, int maxCount)
         {
-            return FilterChallenge(challengeId)
-                .OrderBy(record => record.elapsedSeconds)
-                .ThenBy(record => record.moveCount)
-                .Take(Math.Max(0, maxCount))
-                .ToList()
-                .AsReadOnly();
+            return RankingDisplayHelper.TakeTop(FilterChallenge(challengeId), maxCount).AsReadOnly();
         }
 
         public IReadOnlyList<RankingSubmission> GetTopByMoves(string challengeId, int maxCount)
@@ -79,12 +75,19 @@ namespace CubeChallenge3D.Ranking
         public void Load()
         {
             data = SaveService.LoadJson(FileName, new LocalRankingData());
-            if (data.submissions == null)
-            {
-                data.submissions = new List<RankingSubmission>();
-            }
-
+            bool changed = data.saveVersion < SaveDataValidator.CurrentSaveVersion;
+            data.saveVersion = SaveDataValidator.CurrentSaveVersion;
+            int originalCount = data.submissions?.Count ?? 0;
+            data.submissions = (data.submissions ?? new List<RankingSubmission>())
+                .Where(item => item != null && !string.IsNullOrWhiteSpace(item.submissionId))
+                .GroupBy(item => item.submissionId)
+                .Select(group => group.OrderByDescending(item => item.completedAtUtc).First())
+                .ToList();
             SortAndTrim();
+            if (changed || data.submissions.Count != originalCount)
+            {
+                Save();
+            }
         }
 
         public void Save()
@@ -97,6 +100,7 @@ namespace CubeChallenge3D.Ranking
             return data.submissions.Where(record => record != null
                 && record.completed
                 && record.isVerified
+                && !record.isDebugClear
                 && record.challengeId == challengeId);
         }
 
