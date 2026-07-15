@@ -43,9 +43,28 @@ uvicorn app.main:app --host 0.0.0.0 --port $PORT
 
 - `GET /health`
 - `GET /challenge/today`
+- `GET /players/check-nickname?nickname=CubeKing`
+- `POST /players/create`
+- `GET /players/{profileId}`
+- `PATCH /players/{profileId}/avatar`
 - `POST /ranking/submit`
 - `GET /ranking/top?challengeId=daily_2026_06_06&limit=10`
 - `GET /ranking/my-records?playerId=...`
+
+## Player Profile Example
+
+```json
+{
+  "profileId": "local-player-guid",
+  "nickname": "CubeKing",
+  "avatarId": 1
+}
+```
+
+Nicknames are checked server-side before creation: 1-15 characters,
+English/Korean/numbers only, no whitespace, special characters, reserved names,
+or hardcoded banned words. `avatarId` currently follows the Unity local profile
+range `0-3`.
 
 ## Submit Example
 
@@ -55,6 +74,7 @@ uvicorn app.main:app --host 0.0.0.0 --port $PORT
   "challengeId": "daily_2026_06_06",
   "playerId": "local-guid",
   "playerName": "Player",
+  "avatarId": 1,
   "elapsedSeconds": 35.24,
   "moveCount": 48,
   "scrambleNotation": "R U F2",
@@ -89,3 +109,10 @@ Before public release, add:
 - duplicate submission hardening
 - Alembic migrations
 - restricted CORS origins
+
+## Schema Notes
+
+`ranking_submissions.avatar_id` is nullable for backward compatibility with
+older clients and older saved records. Until Alembic is introduced, app startup
+adds the column with a guarded `ALTER TABLE` when an existing database is
+missing it. Do not reset the production database for this change.

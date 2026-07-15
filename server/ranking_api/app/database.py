@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import declarative_base, sessionmaker
 
 from app.config import settings
@@ -29,3 +29,23 @@ def get_db():
 def init_db() -> None:
     # Good enough for the first Railway prototype. Introduce Alembic before production.
     Base.metadata.create_all(bind=engine)
+    ensure_runtime_columns()
+
+
+def ensure_runtime_columns() -> None:
+    inspector = inspect(engine)
+    table_names = inspector.get_table_names()
+    with engine.begin() as connection:
+        if "ranking_submissions" in table_names:
+            ranking_columns = {column["name"] for column in inspector.get_columns("ranking_submissions")}
+            if "avatar_id" not in ranking_columns:
+                connection.execute(text("ALTER TABLE ranking_submissions ADD COLUMN avatar_id INTEGER"))
+
+        if "player_profiles" in table_names:
+            profile_columns = {column["name"] for column in inspector.get_columns("player_profiles")}
+            if "google_play_player_id" not in profile_columns:
+                connection.execute(text("ALTER TABLE player_profiles ADD COLUMN google_play_player_id VARCHAR(160)"))
+            if "google_account_id" not in profile_columns:
+                connection.execute(text("ALTER TABLE player_profiles ADD COLUMN google_account_id VARCHAR(160)"))
+            if "google_email_hash" not in profile_columns:
+                connection.execute(text("ALTER TABLE player_profiles ADD COLUMN google_email_hash VARCHAR(160)"))
