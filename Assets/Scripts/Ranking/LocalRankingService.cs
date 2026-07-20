@@ -54,6 +54,25 @@ namespace CubeChallenge3D.Ranking
             });
         }
 
+        public Task<RankingFetchResult> GetMyRecordsAsync(string playerId, int maxCount)
+        {
+            List<RankingSubmission> records = store.GetPlayerRecords(playerId, maxCount).ToList();
+            return Task.FromResult(new RankingFetchResult
+            {
+                success = true,
+                fromCache = false,
+                message = string.IsNullOrWhiteSpace(playerId)
+                    ? "Create a profile first."
+                    : "Local Records. Server: Not connected.",
+                records = records
+            });
+        }
+
+        public Task<RankingRankResult> GetRankAsync(string challengeId, string playerId, string submissionId)
+        {
+            return Task.FromResult(store.GetRank(challengeId, submissionId));
+        }
+
         public RankingFetchResult GetCachedTop(string challengeId, int maxCount)
         {
             return new RankingFetchResult

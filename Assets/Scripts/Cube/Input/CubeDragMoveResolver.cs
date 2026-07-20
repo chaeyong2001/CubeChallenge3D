@@ -45,12 +45,6 @@ namespace CubeChallenge3D.Cube.Input
             }
 
             descriptor = new LayerMoveDescriptor(axis, layerIndex, turns);
-            if (descriptor.IsMiddleLayer)
-            {
-                ignoredReason = "Middle layer controls are disabled";
-                return false;
-            }
-
             return true;
         }
 

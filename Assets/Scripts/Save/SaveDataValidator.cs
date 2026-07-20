@@ -23,8 +23,10 @@ namespace CubeChallenge3D.Save
             bool changed = false;
             if (data.saveVersion < 2)
             {
-                data.hearts = 5;
-                data.lastHeartRegenTimeUtc = DateTime.UtcNow.ToString("o");
+                if (string.IsNullOrWhiteSpace(data.lastHeartRegenTimeUtc))
+                {
+                    data.lastHeartRegenTimeUtc = DateTime.UtcNow.ToString("o");
+                }
                 changed = true;
             }
 
@@ -159,11 +161,12 @@ namespace CubeChallenge3D.Save
             List<StageMilestoneReward> source = data.rewards ?? new List<StageMilestoneReward>();
             data.rewards = source
                 .Where(item => item != null && item.blockIndex >= 0)
-                .GroupBy(item => item.blockIndex)
+                .GroupBy(item => new { item.stageType, item.blockIndex })
                 .Select(group =>
                 {
                     StageMilestoneReward merged = group.First();
                     merged.isClaimed = group.Any(item => item.isClaimed);
+                    merged.claimedByUser = group.Any(item => item.claimedByUser);
                     int requiredStars = merged.requiredStars <= 0 ? 30 : merged.requiredStars;
                     int rewardGems = Math.Max(0, merged.rewardGems);
                     changed |= requiredStars != merged.requiredStars || rewardGems != merged.rewardGems;
@@ -171,7 +174,8 @@ namespace CubeChallenge3D.Save
                     merged.rewardGems = rewardGems;
                     return merged;
                 })
-                .OrderBy(item => item.blockIndex)
+                .OrderBy(item => item.stageType)
+                .ThenBy(item => item.blockIndex)
                 .ToList();
             return changed || data.rewards.Count != source.Count;
         }
@@ -185,7 +189,10 @@ namespace CubeChallenge3D.Save
 
             bool changed = UpgradeVersion(ref data.saveVersion);
             changed |= ClampNonNegative(ref data.dailyCoinsAdCount);
+            changed |= ClampNonNegative(ref data.dailyShopCoinAdCount);
             changed |= ClampNonNegative(ref data.dailySolverBonusAdCount);
+            changed |= ClampNonNegative(ref data.dailyHeartAdTotalCount);
+            changed |= ClampNonNegative(ref data.heartAdBatchCount);
             string currentDate = today.ToString("yyyy-MM-dd");
             if (!DateTime.TryParseExact(
                     data.lastResetDate,
@@ -196,8 +203,24 @@ namespace CubeChallenge3D.Save
                 || savedDate.Date != today.Date)
             {
                 data.dailyCoinsAdCount = 0;
+                data.dailyShopCoinAdCount = 0;
                 data.dailySolverBonusAdCount = 0;
                 data.lastResetDate = currentDate;
+                changed = true;
+            }
+
+            if (!DateTime.TryParseExact(
+                    data.dailyHeartAdDate,
+                    "yyyy-MM-dd",
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.None,
+                    out DateTime savedHeartAdDate)
+                || savedHeartAdDate.Date != today.Date)
+            {
+                data.dailyHeartAdDate = currentDate;
+                data.dailyHeartAdTotalCount = 0;
+                data.heartAdBatchCount = 0;
+                data.heartAdBatchCooldownEndTime = string.Empty;
                 changed = true;
             }
 

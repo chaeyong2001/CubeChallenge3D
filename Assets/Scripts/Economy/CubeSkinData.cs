@@ -14,6 +14,7 @@ namespace CubeChallenge3D.Economy
         public int priceGems;
         public bool isDefaultUnlocked;
         public string rarity;
+        public string purchaseType;
         public Color bodyColor;
         public Color whiteColor;
         public Color yellowColor;
@@ -29,6 +30,8 @@ namespace CubeChallenge3D.Economy
         public float textureVisibility;
         public bool useTextureEmission;
         public string stickerTextureRoot;
+        public float stickerSizeMultiplier = 1f;
+        public float stickerOffsetAdd;
 
         public Color GetColor(CubeColor color)
         {

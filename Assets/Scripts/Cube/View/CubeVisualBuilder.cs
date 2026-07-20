@@ -152,9 +152,9 @@ namespace CubeChallenge3D.Cube.View
 
             GameObject sticker = RuntimePrimitiveFactory.CreateQuad($"Sticker_{face}");
             sticker.transform.SetParent(cubie, false);
-            sticker.transform.localPosition = CubeFaceletMapping.FaceNormal(face) * (0.5f + stickerOffset);
+            sticker.transform.localPosition = CubeFaceletMapping.FaceNormal(face) * (0.5f + GetEffectiveStickerOffset());
             sticker.transform.localRotation = CubeFaceletMapping.StickerRotation(face);
-            sticker.transform.localScale = Vector3.one * stickerSize;
+            sticker.transform.localScale = Vector3.one * GetEffectiveStickerSize();
 
             CubeColor color = state.GetColor(face, row, col);
             sticker.GetComponent<MeshRenderer>().sharedMaterial = GetColorMaterial(color);
@@ -214,6 +214,22 @@ namespace CubeChallenge3D.Cube.View
                 case CubeColor.Orange: return orangeMaterial;
                 default: return debugMaterial;
             }
+        }
+
+        private float GetEffectiveStickerSize()
+        {
+            float multiplier = activeSkin != null
+                ? Mathf.Max(0.75f, activeSkin.stickerSizeMultiplier)
+                : 1f;
+            return Mathf.Min(0.96f, stickerSize * multiplier);
+        }
+
+        private float GetEffectiveStickerOffset()
+        {
+            float extraOffset = activeSkin != null
+                ? Mathf.Max(0f, activeSkin.stickerOffsetAdd)
+                : 0f;
+            return stickerOffset + extraOffset;
         }
 
         private static Material CreateRuntimeMaterial(Color color, CubeSkinData skin, CubeColor stickerColor)
@@ -286,6 +302,15 @@ namespace CubeChallenge3D.Cube.View
             if (material.HasProperty("_Smoothness"))
             {
                 material.SetFloat("_Smoothness", Mathf.Clamp01(skin.smoothness));
+            }
+            if (material.HasProperty("_Glossiness"))
+            {
+                material.SetFloat("_Glossiness", Mathf.Clamp01(skin.smoothness));
+            }
+            if (material.HasProperty("_SpecColor"))
+            {
+                Color specular = Color.Lerp(Color.white, color, stickerColor == CubeColor.None ? 0.2f : 0.45f);
+                material.SetColor("_SpecColor", specular);
             }
             if (skin.emissionStrength > 0f && material.HasProperty("_EmissionColor"))
             {

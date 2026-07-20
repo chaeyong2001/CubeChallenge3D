@@ -8,7 +8,12 @@ namespace CubeChallenge3D.Ads
     {
         public int saveVersion;
         public int dailyCoinsAdCount;
+        public int dailyShopCoinAdCount;
         public int dailySolverBonusAdCount;
+        public string dailyHeartAdDate;
+        public int dailyHeartAdTotalCount;
+        public int heartAdBatchCount;
+        public string heartAdBatchCooldownEndTime;
         public string lastResetDate;
     }
 
@@ -35,6 +40,42 @@ namespace CubeChallenge3D.Ads
             }
         }
 
+        public int DailyShopCoinAdCount
+        {
+            get
+            {
+                EnsureCurrentDate();
+                return data.dailyShopCoinAdCount;
+            }
+        }
+
+        public int DailyHeartAdTotalCount
+        {
+            get
+            {
+                EnsureCurrentDate();
+                return data.dailyHeartAdTotalCount;
+            }
+        }
+
+        public int HeartAdBatchCount
+        {
+            get
+            {
+                EnsureCurrentDate();
+                return data.heartAdBatchCount;
+            }
+        }
+
+        public DateTime HeartAdBatchCooldownEndTimeUtc
+        {
+            get
+            {
+                EnsureCurrentDate();
+                return TryParseUtc(data.heartAdBatchCooldownEndTime, out DateTime parsed) ? parsed : DateTime.MinValue;
+            }
+        }
+
         public void RecordReward(RewardedAdPlacement placement)
         {
             EnsureCurrentDate();
@@ -42,9 +83,26 @@ namespace CubeChallenge3D.Ads
             {
                 data.dailyCoinsAdCount++;
             }
+            else if (placement == RewardedAdPlacement.ShopCoinReward)
+            {
+                data.dailyShopCoinAdCount++;
+            }
             else if (placement == RewardedAdPlacement.SolverBonusTicket)
             {
                 data.dailySolverBonusAdCount++;
+            }
+
+            SaveService.SaveJson(FileName, data);
+        }
+
+        public void RecordHeartAdReward(DateTime utcNow, int batchLimit, TimeSpan batchCooldown)
+        {
+            EnsureCurrentDate();
+            data.dailyHeartAdTotalCount++;
+            data.heartAdBatchCount++;
+            if (data.heartAdBatchCount >= batchLimit)
+            {
+                data.heartAdBatchCooldownEndTime = utcNow.Add(batchCooldown).ToString("o");
             }
 
             SaveService.SaveJson(FileName, data);
@@ -59,7 +117,9 @@ namespace CubeChallenge3D.Ads
         private void EnsureCurrentDate()
         {
             data ??= SaveService.LoadJson(FileName, CreateDefault());
-            if (!SaveDataValidator.Normalize(data, DateTime.Today))
+            bool changed = SaveDataValidator.Normalize(data, DateTime.Today);
+            changed |= RefreshHeartBatchCooldown(DateTime.UtcNow);
+            if (!changed)
             {
                 return;
             }
@@ -73,6 +133,37 @@ namespace CubeChallenge3D.Ads
             {
                 lastResetDate = DateTime.Today.ToString("yyyy-MM-dd")
             };
+        }
+
+        private bool RefreshHeartBatchCooldown(DateTime utcNow)
+        {
+            if (data == null)
+            {
+                return false;
+            }
+
+            if (string.IsNullOrWhiteSpace(data.heartAdBatchCooldownEndTime)
+                || !TryParseUtc(data.heartAdBatchCooldownEndTime, out DateTime cooldownEnd)
+                || utcNow < cooldownEnd)
+            {
+                return false;
+            }
+
+            data.heartAdBatchCount = 0;
+            data.heartAdBatchCooldownEndTime = string.Empty;
+            return true;
+        }
+
+        private static bool TryParseUtc(string value, out DateTime parsedUtc)
+        {
+            if (DateTime.TryParse(value, out DateTime parsed))
+            {
+                parsedUtc = parsed.ToUniversalTime();
+                return true;
+            }
+
+            parsedUtc = DateTime.MinValue;
+            return false;
         }
     }
 }

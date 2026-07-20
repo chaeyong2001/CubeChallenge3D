@@ -15,6 +15,7 @@ namespace CubeChallenge3D.Ranking
     public sealed class PendingRankingSubmissionStore
     {
         private const string FileName = "pending_ranking_submissions.json";
+        private const int RankingAvatarSaveVersion = 3;
 
         private readonly int maxPending;
         private PendingRankingSubmissionData data;
@@ -90,14 +91,16 @@ namespace CubeChallenge3D.Ranking
         public void Load()
         {
             data = SaveService.LoadJson(FileName, new PendingRankingSubmissionData());
-            bool changed = data.saveVersion < SaveDataValidator.CurrentSaveVersion;
-            data.saveVersion = SaveDataValidator.CurrentSaveVersion;
+            bool migrateMissingAvatarIds = data.saveVersion < RankingAvatarSaveVersion;
+            bool changed = data.saveVersion < RankingAvatarSaveVersion;
+            data.saveVersion = Math.Max(SaveDataValidator.CurrentSaveVersion, RankingAvatarSaveVersion);
             int originalCount = data.submissions?.Count ?? 0;
             data.submissions = (data.submissions ?? new List<RankingSubmission>())
                 .Where(item => item != null && !item.isDebugClear && !string.IsNullOrWhiteSpace(item.submissionId))
                 .GroupBy(item => item.submissionId)
                 .Select(group => group.OrderByDescending(item => item.completedAtUtc).First())
                 .ToList();
+            changed |= NormalizeAvatarIds(data.submissions, migrateMissingAvatarIds);
             foreach (RankingSubmission submission in data.submissions.Where(item => string.IsNullOrWhiteSpace(item.syncStatus)))
             {
                 submission.syncStatus = RankingSyncStatus.Pending;
@@ -127,6 +130,31 @@ namespace CubeChallenge3D.Ranking
                 .OrderByDescending(item => item.completedAtUtc)
                 .Take(maxPending)
                 .ToList();
+        }
+
+        private static bool NormalizeAvatarIds(IEnumerable<RankingSubmission> submissions, bool migrateMissingAvatarIds)
+        {
+            bool changed = false;
+            foreach (RankingSubmission submission in submissions)
+            {
+                if (submission == null)
+                {
+                    continue;
+                }
+
+                if (migrateMissingAvatarIds)
+                {
+                    submission.avatarId = -1;
+                    changed = true;
+                }
+                else if (submission.avatarId < -1 || submission.avatarId > 3)
+                {
+                    submission.avatarId = -1;
+                    changed = true;
+                }
+            }
+
+            return changed;
         }
     }
 }

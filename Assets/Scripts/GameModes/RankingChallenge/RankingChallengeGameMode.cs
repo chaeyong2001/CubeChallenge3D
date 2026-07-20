@@ -1,11 +1,14 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using CubeChallenge3D.Audio;
 using CubeChallenge3D.Cube.Input;
 using CubeChallenge3D.Cube.Model;
 using CubeChallenge3D.Cube.Runtime;
 using CubeChallenge3D.Cube.Utils;
+using CubeChallenge3D.Economy;
 using CubeChallenge3D.Ranking;
 using CubeChallenge3D.Save;
+using CubeChallenge3D.Save.Profile;
 using UnityEngine;
 
 namespace CubeChallenge3D.GameModes.RankingChallenge
@@ -15,13 +18,17 @@ namespace CubeChallenge3D.GameModes.RankingChallenge
         [SerializeField] private CubeController cubeController;
         [SerializeField] private CubeControlModeController controlModeController;
         [SerializeField] private int scrambleLength = 20;
+        [SerializeField] private int entryCoinCost = 50;
 
         private readonly List<CubeMove> activeScramble = new List<CubeMove>();
         private SettingsStore settingsStore;
+        private PlayerProfileStore playerProfileStore;
         private LocalRankingStore localRankingStore;
         private CachedRankingStore cachedRankingStore;
         private PendingRankingSubmissionStore pendingSubmissionStore;
+        private WalletStore walletStore;
         private IRankingService rankingService;
+        private WeeklyRankingRewardService weeklyRewardService;
         private RankingChallengeConfig config;
         private readonly List<RankingSubmission> displayedRankingRecords = new List<RankingSubmission>();
         private RankingChallengeState state = RankingChallengeState.Ready;
@@ -31,15 +38,19 @@ namespace CubeChallenge3D.GameModes.RankingChallenge
         private bool hasSubmittedCurrentResult;
         private string lastSubmitMessage = "Server: Not connected";
         private string rankingSourceLabel = "Local Ranking";
+        private RankingSubmission latestSubmittedRecord;
 
         public RankingChallengeState State => state;
         public RankingChallengeConfig Config => config;
         public LocalRankingStore LocalRankingStore => localRankingStore;
         public IReadOnlyList<RankingSubmission> DisplayedRankingRecords => displayedRankingRecords.AsReadOnly();
         public string RankingSourceLabel => rankingSourceLabel;
+        public RankingSubmission LatestSubmittedRecord => latestSubmittedRecord;
         public string LastSubmitMessage => lastSubmitMessage;
         public float ElapsedTime => state == RankingChallengeState.Solved ? solvedTime : elapsedTime;
         public int MoveCount => state == RankingChallengeState.Solved ? solvedMoveCount : cubeController?.UserMoveCount ?? 0;
+        public PlayerProfile CurrentPlayerProfile => playerProfileStore?.Current;
+        public int EntryCoinCost => entryCoinCost;
 
         public void Initialize(
             CubeController controller,
@@ -47,6 +58,8 @@ namespace CubeChallenge3D.GameModes.RankingChallenge
             SettingsStore store,
             LocalRankingStore rankingStore)
         {
+            AudioFeedbackManager.SetBgmSuppressed(AudioFeedbackManager.RankingChallengeBgmReason, true);
+
             if (cubeController != null)
             {
                 cubeController.MoveCommandCompleted -= HandleMoveCompleted;
@@ -56,11 +69,21 @@ namespace CubeChallenge3D.GameModes.RankingChallenge
             cubeController = controller;
             controlModeController = controlController;
             settingsStore = store;
+            playerProfileStore = new PlayerProfileStore();
+            playerProfileStore.SyncAppSettings(settingsStore);
             localRankingStore = rankingStore ?? new LocalRankingStore();
             cachedRankingStore = new CachedRankingStore();
             pendingSubmissionStore = new PendingRankingSubmissionStore();
-            rankingService = CreateRankingService();
+            walletStore = new WalletStore();
             config = RankingChallengeConfig.CreateToday(scrambleLength);
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            if (settingsStore?.Current != null && settingsStore.Current.showDebugPanel)
+            {
+                RankingTestDataSeeder.EnsureWorldRankingTestData(config, localRankingStore, cachedRankingStore);
+            }
+#endif
+            rankingService = CreateRankingService();
+            weeklyRewardService = CreateWeeklyRewardService();
             cubeController.MoveCommandCompleted += HandleMoveCompleted;
             cubeController.ScrambleCompleted += HandleScrambleCompleted;
             cubeController.SetUserInputEnabled(false);
@@ -69,10 +92,16 @@ namespace CubeChallenge3D.GameModes.RankingChallenge
             _ = rankingService.RetryPendingAsync();
         }
 
-        public void PrepareChallenge()
+        public void PrepareChallenge(bool chargeEntry = true, bool instantScramble = true)
         {
             if (cubeController == null || cubeController.IsBusy)
             {
+                return;
+            }
+
+            if (chargeEntry && !walletStore.SpendCoins(entryCoinCost))
+            {
+                lastSubmitMessage = $"Not enough coins. This challenge costs {entryCoinCost} Coins.";
                 return;
             }
 
@@ -87,7 +116,14 @@ namespace CubeChallenge3D.GameModes.RankingChallenge
             cubeController.SetUserInputEnabled(false);
             SetState(RankingChallengeState.Scrambling);
             RefreshRankings();
-            cubeController.ApplyScrambleFromSolved(activeScramble);
+            if (instantScramble)
+            {
+                cubeController.ApplyScrambleFromSolvedInstant(activeScramble);
+            }
+            else
+            {
+                cubeController.ApplyScrambleFromSolved(activeScramble);
+            }
         }
 
         public void StartChallenge()
@@ -115,6 +151,111 @@ namespace CubeChallenge3D.GameModes.RankingChallenge
             await rankingService.RetryPendingAsync();
             lastSubmitMessage = IsServerConfigured() ? "Retry complete" : "Server: Not connected";
             await RefreshRankingsAsync();
+        }
+
+        public Task<RankingFetchResult> FetchWorldRankingsAsync(int maxCount)
+        {
+            if (rankingService == null || config == null)
+            {
+                return Task.FromResult(new RankingFetchResult
+                {
+                    success = false,
+                    message = "Ranking is not ready.",
+                    records = new List<RankingSubmission>()
+                });
+            }
+
+            return rankingService.GetTopAsync(config.challengeId, maxCount);
+        }
+
+        public Task<RankingFetchResult> FetchMyRankingsAsync(int maxCount)
+        {
+            PlayerProfile profile = CurrentPlayerProfile;
+            string playerId = profile != null ? profile.profileId : string.Empty;
+            if (rankingService == null || string.IsNullOrWhiteSpace(playerId))
+            {
+                return Task.FromResult(new RankingFetchResult
+                {
+                    success = false,
+                    message = "Create a profile first.",
+                    records = new List<RankingSubmission>()
+                });
+            }
+
+            return rankingService.GetMyRecordsAsync(playerId, maxCount);
+        }
+
+        public Task<RankingRankResult> FetchLatestRankAsync()
+        {
+            if (rankingService == null || config == null || latestSubmittedRecord == null)
+            {
+                return Task.FromResult(new RankingRankResult
+                {
+                    success = false,
+                    message = "No latest record.",
+                    rank = 0
+                });
+            }
+
+            return rankingService.GetRankAsync(
+                config.challengeId,
+                latestSubmittedRecord.playerId,
+                latestSubmittedRecord.submissionId);
+        }
+
+        public Task<WeeklyRankingRewardDto> FetchWeeklyRankingRewardAsync()
+        {
+            if (weeklyRewardService == null || !weeklyRewardService.IsConfigured)
+            {
+                return Task.FromResult(new WeeklyRankingRewardDto
+                {
+                    exists = false,
+                    message = "Weekly ranking rewards are unavailable."
+                });
+            }
+
+            return weeklyRewardService.GetClaimableAsync(GetCurrentPlayerId());
+        }
+
+        public Task<WeeklyRankingRewardInfoResponseDto> FetchWeeklyRankingRewardInfoAsync()
+        {
+            return weeklyRewardService != null
+                ? weeklyRewardService.GetInfoAsync()
+                : Task.FromResult(new WeeklyRankingRewardInfoResponseDto
+                {
+                    success = false,
+                    description = "Weekly rankings run from Monday to Sunday.\nRewards are distributed every Monday at 00:00 KST.",
+                    rewards = new[] { "1st Place: 15 Gems", "2nd Place: 10 Gems", "3rd Place: 100 Coins" }
+                });
+        }
+
+        public async Task<WeeklyRankingRewardClaimResponseDto> ClaimWeeklyRankingRewardAsync(WeeklyRankingRewardDto reward)
+        {
+            if (weeklyRewardService == null || reward == null)
+            {
+                return new WeeklyRankingRewardClaimResponseDto
+                {
+                    success = false,
+                    message = "Weekly ranking rewards are unavailable."
+                };
+            }
+
+            WeeklyRankingRewardClaimResponseDto response = await weeklyRewardService.ClaimAsync(
+                GetCurrentPlayerId(),
+                reward.weekStartKst);
+            if (response != null && response.success && response.claimed && response.reward != null)
+            {
+                if (string.Equals(response.reward.rewardType, "gem", System.StringComparison.OrdinalIgnoreCase))
+                {
+                    walletStore.AddGems(response.reward.rewardAmount);
+                }
+                else if (string.Equals(response.reward.rewardType, "coin", System.StringComparison.OrdinalIgnoreCase))
+                {
+                    walletStore.AddCoins(response.reward.rewardAmount);
+                }
+            }
+
+            return response;
         }
 
         private void Update()
@@ -158,6 +299,7 @@ namespace CubeChallenge3D.GameModes.RankingChallenge
             solvedTime = elapsedTime;
             solvedMoveCount = cubeController.UserMoveCount;
             cubeController.SetUserInputEnabled(false);
+            AudioFeedbackManager.PlayClearVibration();
             SubmitResultOnce();
             SetState(RankingChallengeState.Solved);
         }
@@ -187,6 +329,7 @@ namespace CubeChallenge3D.GameModes.RankingChallenge
             // also bring the visible cube back to the solved state for diagnostics.
             cubeController.ResetSolved();
             cubeController.SetUserInputEnabled(false);
+            AudioFeedbackManager.PlayClearVibration();
             SetState(RankingChallengeState.Solved);
 #endif
         }
@@ -214,12 +357,19 @@ namespace CubeChallenge3D.GameModes.RankingChallenge
             string controlMode = controlModeController != null
                 ? controlModeController.CurrentControlMode.ToString()
                 : string.Empty;
-            string playerName = settingsStore?.Current?.playerName ?? "Player";
-            string playerId = settingsStore?.Current?.playerId ?? "local";
+            PlayerProfile profile = playerProfileStore?.Current;
+            string playerName = profile != null && !string.IsNullOrWhiteSpace(profile.nickname)
+                ? profile.nickname
+                : settingsStore?.Current?.playerName ?? "Player";
+            string playerId = profile != null && !string.IsNullOrWhiteSpace(profile.profileId)
+                ? profile.profileId
+                : settingsStore?.Current?.playerId ?? "local";
+            int avatarId = profile != null ? profile.avatarId : -1;
             RankingSubmission submission = RankingSubmission.Create(
                 config.challengeId,
                 playerId,
                 playerName,
+                avatarId,
                 solvedTime,
                 solvedMoveCount,
                 MoveUtility.ToNotationSequence(activeScramble),
@@ -236,6 +386,7 @@ namespace CubeChallenge3D.GameModes.RankingChallenge
 
             lastSubmitMessage = IsServerConfigured() ? "Submitting..." : "Saved locally";
             RankingSubmitResult submitResult = await rankingService.SubmitAsync(submission);
+            latestSubmittedRecord = submitResult?.submission ?? submission;
             lastSubmitMessage = submitResult.message;
             await RefreshRankingsAsync();
         }
@@ -258,6 +409,29 @@ namespace CubeChallenge3D.GameModes.RankingChallenge
             }
 
             return new LocalRankingService(localRankingStore, cachedRankingStore, pendingSubmissionStore);
+        }
+
+        private WeeklyRankingRewardService CreateWeeklyRewardService()
+        {
+            if (IsServerConfigured())
+            {
+                return new WeeklyRankingRewardService(
+                    settingsStore.Current.rankingApiBaseUrl,
+                    settingsStore.Current.rankingRequestTimeoutSeconds);
+            }
+
+            return null;
+        }
+
+        private string GetCurrentPlayerId()
+        {
+            PlayerProfile profile = CurrentPlayerProfile;
+            if (profile != null && !string.IsNullOrWhiteSpace(profile.profileId))
+            {
+                return profile.profileId;
+            }
+
+            return settingsStore?.Current?.playerId ?? string.Empty;
         }
 
         private bool IsServerConfigured()

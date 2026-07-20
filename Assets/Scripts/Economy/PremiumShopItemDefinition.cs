@@ -18,14 +18,6 @@ namespace CubeChallenge3D.Economy
             {
                 new PremiumShopItemDefinition
                 {
-                    itemId = "skin_galaxy",
-                    displayName = "Galaxy Cube",
-                    description = "Sun, moon, planets, stars, and galaxy stickers.",
-                    gemPrice = 200,
-                    category = "CubeSkin"
-                },
-                new PremiumShopItemDefinition
-                {
                     itemId = "skin_national_flag",
                     displayName = "National Flag Cube",
                     description = "Six national flag stickers.",
@@ -38,14 +30,6 @@ namespace CubeChallenge3D.Economy
                     displayName = "Animal Friends Cube",
                     description = "Six cute animal face stickers.",
                     gemPrice = 150,
-                    category = "CubeSkin"
-                },
-                new PremiumShopItemDefinition
-                {
-                    itemId = "skin_sports",
-                    displayName = "Sports Cube",
-                    description = "Six iconic sports stickers.",
-                    gemPrice = 140,
                     category = "CubeSkin"
                 }
             };

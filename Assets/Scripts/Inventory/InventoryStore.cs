@@ -17,6 +17,11 @@ namespace CubeChallenge3D.Inventory
         public int SolverTickets => Data.solverTickets;
         public InventoryData Data => inventory ?? (inventory = Load());
 
+        public void Reload()
+        {
+            inventory = Load();
+        }
+
         public bool TryConsume(StageAssistItemType itemType)
         {
             switch (itemType)

@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using CubeChallenge3D.Stages.Generation;
 using CubeChallenge3D.Stages.Model;
 
 namespace CubeChallenge3D.Stages.Validation
@@ -17,9 +18,7 @@ namespace CubeChallenge3D.Stages.Validation
 
             foreach (StageData stage in stages.Where(stage => stage != null))
             {
-                int localNumber = stage.stageType == StageType.ReverseTargetStage
-                    ? stage.stageNumber - 100
-                    : stage.stageNumber;
+                int localNumber = GetLocalNumber(stage);
                 int minimum = stage.minimumMoves > 0 ? stage.minimumMoves : stage.minMoveCount;
 
                 if (minimum < 5)
@@ -27,7 +26,7 @@ namespace CubeChallenge3D.Stages.Validation
                     result.AddError($"{stage.stageId}: minimumMoves is below 5.");
                 }
 
-                if (localNumber >= 1 && localNumber <= 10)
+                if (stage.stageType != StageType.InfinityStage && localNumber >= 1 && localNumber <= 10)
                 {
                     if (minimum < 5 || minimum > 7)
                     {
@@ -59,6 +58,8 @@ namespace CubeChallenge3D.Stages.Validation
 
             ValidateBlockCurve(stages, StageType.SolveStage, result);
             ValidateBlockCurve(stages, StageType.ReverseTargetStage, result);
+            ValidateBlockCurve(stages, StageType.InfinityStage, result);
+            ValidateBlockCurve(stages, StageType.TutorialStage, result);
             return result;
         }
 
@@ -68,7 +69,9 @@ namespace CubeChallenge3D.Stages.Validation
             StageValidationResult result)
         {
             double previousAverage = 0d;
-            for (int block = 0; block < 10; block++)
+            int stageCount = stages.Count(stage => stage != null && stage.stageType == type);
+            int blockCount = (stageCount + 9) / 10;
+            for (int block = 0; block < blockCount; block++)
             {
                 int localStart = block * 10 + 1;
                 List<StageData> blockStages = stages.Where(stage =>
@@ -96,9 +99,32 @@ namespace CubeChallenge3D.Stages.Validation
 
         private static int GetLocalNumber(StageData stage)
         {
-            return stage.stageType == StageType.ReverseTargetStage
-                ? stage.stageNumber - 100
-                : stage.stageNumber;
+            string id = stage.stageId ?? string.Empty;
+            int separator = id.LastIndexOf('_');
+            if (separator >= 0
+                && separator < id.Length - 1
+                && int.TryParse(id.Substring(separator + 1), out int parsed)
+                && parsed > 0)
+            {
+                return parsed;
+            }
+
+            if (stage.stageType == StageType.ReverseTargetStage)
+            {
+                return stage.stageNumber - StagePackGenerator.NormalStageCount;
+            }
+
+            if (stage.stageType == StageType.InfinityStage)
+            {
+                return stage.stageNumber - (StagePackGenerator.NormalStageCount + StagePackGenerator.HardStageCount);
+            }
+
+            if (stage.stageType == StageType.TutorialStage)
+            {
+                return stage.stageNumber - StagePackGenerator.TutorialFirstStageNumber + 1;
+            }
+
+            return stage.stageNumber;
         }
 
         private static void GetRewardRange(StageDifficulty difficulty, out int minimum, out int maximum)

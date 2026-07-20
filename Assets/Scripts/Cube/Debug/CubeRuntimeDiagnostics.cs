@@ -74,6 +74,9 @@ namespace CubeChallenge3D.Cube.Debugging
 
         public void SetDebugPanelVisible(bool visible)
         {
+#if !UNITY_EDITOR && !DEVELOPMENT_BUILD
+            visible = false;
+#endif
             showDebugPanel = visible;
         }
 

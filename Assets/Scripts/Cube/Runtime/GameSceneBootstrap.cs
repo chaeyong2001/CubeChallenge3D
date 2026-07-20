@@ -21,6 +21,8 @@ namespace CubeChallenge3D.Cube.Runtime
     {
         private const string GameSceneName = "Game";
         private const string BootstrapName = "GameSceneBootstrap";
+        private static readonly Vector3 StageGameplayViewOffset = new Vector3(0f, 0.24f, 0f);
+        private static readonly Vector3 RankingChallengeViewOffset = new Vector3(0f, 0.10f, 0f);
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         private static void RegisterSceneLoadedHandler()
@@ -60,6 +62,15 @@ namespace CubeChallenge3D.Cube.Runtime
 
             orbitController.Initialize(controller);
             orbitController.SetOrbitSensitivity(settingsStore.Current.viewSensitivity);
+            if (launchMode == GameLaunchMode.StagePlay
+                || launchMode == GameLaunchMode.RankingChallenge
+                || launchMode == GameLaunchMode.PracticeRanking)
+            {
+                orbitController.SetBaseScale(0.62f, 0.88f);
+                orbitController.SetViewOffset(launchMode == GameLaunchMode.RankingChallenge
+                    ? RankingChallengeViewOffset
+                    : StageGameplayViewOffset);
+            }
 
             CubeControlModeController controlModeController = GetComponent<CubeControlModeController>();
             if (controlModeController == null)
@@ -105,11 +116,7 @@ namespace CubeChallenge3D.Cube.Runtime
             }
 
             diagnostics.Initialize(controller, orbitController, controlModeController, faceDragInput);
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
-            diagnostics.SetDebugPanelVisible(settingsStore.Current.showDebugPanel);
-#else
             diagnostics.SetDebugPanelVisible(false);
-#endif
 
             SettingsPanelUI settingsPanel = GetComponent<SettingsPanelUI>();
             if (settingsPanel == null)
@@ -119,7 +126,8 @@ namespace CubeChallenge3D.Cube.Runtime
 
             settingsPanel.Initialize(settingsStore, controlModeController, diagnostics);
 
-            if (launchMode == GameLaunchMode.RankingChallenge)
+            if (launchMode == GameLaunchMode.RankingChallenge
+                || launchMode == GameLaunchMode.PracticeRanking)
             {
                 LocalRankingStore rankingStore = new LocalRankingStore();
                 rankingMode = GetComponent<RankingChallengeGameMode>();
@@ -146,7 +154,7 @@ namespace CubeChallenge3D.Cube.Runtime
                 stageMode.Initialize(controller, controlModeController, stageLoader, stageProgressStore);
                 StageData stage = stageLoader.GetStageById(GameLaunchContext.StageId);
                 stageMode.LoadStage(stage);
-                if (stage == null || stage.stageType == StageType.SolveStage)
+                if (stage == null || !StagePlayGameMode.IsTargetPatternStage(stage))
                 {
                     stageMode.StartStage();
                 }
@@ -165,6 +173,10 @@ namespace CubeChallenge3D.Cube.Runtime
 
             }
 
+            ConfigureCamera();
+            EnsureDirectionalLight();
+            EnsureCubeVisible(controller);
+
             MobileGameHudUI gameHud = GetComponent<MobileGameHudUI>();
             if (gameHud == null)
             {
@@ -181,8 +193,7 @@ namespace CubeChallenge3D.Cube.Runtime
                 rankingMode,
                 stageMode,
                 launchMode != GameLaunchMode.StagePlay);
-            ConfigureCamera();
-            EnsureDirectionalLight();
+            EnsureCubeVisible(controller);
         }
 
         private static void ConfigureCamera()
@@ -223,6 +234,21 @@ namespace CubeChallenge3D.Cube.Runtime
             directionalLight.type = LightType.Directional;
             directionalLight.intensity = 2f;
             lightObject.transform.rotation = Quaternion.Euler(50f, -30f, 0f);
+        }
+
+        private static void EnsureCubeVisible(CubeController controller)
+        {
+            if (controller == null || controller.ViewRoot == null)
+            {
+                return;
+            }
+
+            controller.SetViewVisible(true);
+            Renderer[] renderers = controller.ViewRoot.GetComponentsInChildren<Renderer>(true);
+            foreach (Renderer renderer in renderers)
+            {
+                renderer.enabled = true;
+            }
         }
     }
 }

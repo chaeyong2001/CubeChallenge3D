@@ -6,7 +6,7 @@ namespace CubeChallenge3D.Economy
     public sealed class WalletStore
     {
         private const string FileName = "economy_wallet.json";
-        public const int MaxNaturalHearts = 5;
+        public const int MaxNaturalHearts = 10;
         public const int HeartRegenIntervalSeconds = 120;
         private EconomyWallet wallet;
 
@@ -139,7 +139,7 @@ namespace CubeChallenge3D.Economy
                 new EconomyWallet
                 {
                     coins = 500,
-                    gems = 0,
+                    gems = 30,
                     hearts = MaxNaturalHearts,
                     lastHeartRegenTimeUtc = DateTime.UtcNow.ToString("o")
                 });

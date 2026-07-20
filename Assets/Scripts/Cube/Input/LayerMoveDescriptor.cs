@@ -19,23 +19,13 @@ namespace CubeChallenge3D.Cube.Input
         public bool TryToCubeMove(out CubeMove move)
         {
             move = default;
-            if (IsMiddleLayer || LayerIndex < -1 || LayerIndex > 1 || QuarterTurns == 0)
+            if (LayerIndex < -1 || LayerIndex > 1 || QuarterTurns == 0)
             {
                 return false;
             }
 
-            CubeFace face;
-            switch (Axis)
-            {
-                case CubeAxis.X: face = LayerIndex > 0 ? CubeFace.Right : CubeFace.Left; break;
-                case CubeAxis.Y: face = LayerIndex > 0 ? CubeFace.Up : CubeFace.Down; break;
-                case CubeAxis.Z: face = LayerIndex > 0 ? CubeFace.Front : CubeFace.Back; break;
-                default: return false;
-            }
-
             // Descriptor turns use right-hand rotation around the positive axis.
-            // CubeMove turns are clockwise while viewing the selected face from outside.
-            move = new CubeMove(face, -QuarterTurns * LayerIndex);
+            move = CubeMove.CreateLayer(Axis, LayerIndex, QuarterTurns);
             return true;
         }
 

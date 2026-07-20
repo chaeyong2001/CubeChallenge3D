@@ -5,6 +5,10 @@ namespace CubeChallenge3D.UI.Common
     [RequireComponent(typeof(RectTransform))]
     public sealed class MobileSafeArea : MonoBehaviour
     {
+        private const float MinimumTopInsetRatio = 0.012f;
+        private const float MinimumBottomInsetRatio = 0.018f;
+        private const float MaximumMinimumInsetPixels = 56f;
+
         private RectTransform rectTransform;
         private Rect lastSafeArea;
         private Vector2Int lastScreenSize;
@@ -33,6 +37,10 @@ namespace CubeChallenge3D.UI.Common
             }
 
             Rect safeArea = Screen.safeArea;
+            float minimumTopInset = Mathf.Min(Screen.height * MinimumTopInsetRatio, MaximumMinimumInsetPixels);
+            float minimumBottomInset = Mathf.Min(Screen.height * MinimumBottomInsetRatio, MaximumMinimumInsetPixels);
+            safeArea.yMin = Mathf.Max(safeArea.yMin, minimumBottomInset);
+            safeArea.yMax = Mathf.Min(safeArea.yMax, Screen.height - minimumTopInset);
             rectTransform.anchorMin = new Vector2(
                 safeArea.xMin / Screen.width,
                 safeArea.yMin / Screen.height);

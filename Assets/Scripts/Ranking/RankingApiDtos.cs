@@ -10,6 +10,7 @@ namespace CubeChallenge3D.Ranking
         public string challengeId;
         public string playerId;
         public string playerName;
+        public int avatarId = -1;
         public float elapsedSeconds;
         public int moveCount;
         public string scrambleNotation;
@@ -27,6 +28,7 @@ namespace CubeChallenge3D.Ranking
                 challengeId = submission.challengeId,
                 playerId = submission.playerId,
                 playerName = submission.playerName,
+                avatarId = submission.avatarId,
                 elapsedSeconds = submission.elapsedSeconds,
                 moveCount = submission.moveCount,
                 scrambleNotation = submission.scrambleNotation,
@@ -46,6 +48,7 @@ namespace CubeChallenge3D.Ranking
         public string challengeId;
         public string playerId;
         public string playerName;
+        public int avatarId = -1;
         public float elapsedSeconds;
         public int moveCount;
         public string scrambleNotation;
@@ -66,6 +69,7 @@ namespace CubeChallenge3D.Ranking
                 challengeId = challengeId,
                 playerId = playerId,
                 playerName = playerName,
+                avatarId = avatarId,
                 elapsedSeconds = elapsedSeconds,
                 moveCount = moveCount,
                 scrambleNotation = scrambleNotation,
@@ -89,8 +93,18 @@ namespace CubeChallenge3D.Ranking
     {
         public bool success;
         public bool isVerified;
+        public bool duplicate;
         public string message;
         public RankingRecordDto submission;
+    }
+
+    [Serializable]
+    public sealed class RankingSubmitErrorDto
+    {
+        public bool success;
+        public string reason;
+        public string message;
+        public string detail;
     }
 
     [Serializable]
@@ -102,11 +116,72 @@ namespace CubeChallenge3D.Ranking
     }
 
     [Serializable]
+    public sealed class RankingRankResponseDto
+    {
+        public bool success;
+        public string message;
+        public int rank;
+        public RankingRecordDto record;
+
+        public RankingRankResult ToResult()
+        {
+            return new RankingRankResult
+            {
+                success = success,
+                message = message,
+                rank = rank,
+                record = record?.ToSubmission()
+            };
+        }
+    }
+
+    [Serializable]
     public sealed class ChallengeTodayResponseDto
     {
         public string challengeId;
         public string dateUtc;
         public int seed;
         public int scrambleLength;
+    }
+
+    [Serializable]
+    public sealed class WeeklyRankingRewardDto
+    {
+        public bool exists;
+        public bool claimed;
+        public string weekStartKst;
+        public string weekEndKst;
+        public string playerId;
+        public string nickname;
+        public int rank;
+        public string rewardType;
+        public int rewardAmount;
+        public string message;
+    }
+
+    [Serializable]
+    public sealed class WeeklyRankingRewardClaimRequestDto
+    {
+        public string playerId;
+        public string weekStartKst;
+    }
+
+    [Serializable]
+    public sealed class WeeklyRankingRewardClaimResponseDto
+    {
+        public bool success;
+        public bool claimed;
+        public string message;
+        public WeeklyRankingRewardDto reward;
+    }
+
+    [Serializable]
+    public sealed class WeeklyRankingRewardInfoResponseDto
+    {
+        public bool success;
+        public string weekStartKst;
+        public string weekEndKst;
+        public string description;
+        public string[] rewards;
     }
 }

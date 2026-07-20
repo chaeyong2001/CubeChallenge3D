@@ -13,6 +13,7 @@ namespace CubeChallenge3D.Ads
         public bool IsShowingAd => isShowingAd;
         public bool AdsEnabled => Config.adsEnabled;
         public int DailyCoinsUsed => limitStore.DailyCoinsAdCount;
+        public int DailyShopCoinAdsUsed => limitStore.DailyShopCoinAdCount;
         public int DailySolverTicketsUsed => limitStore.DailySolverBonusAdCount;
 
         public RewardedAdService(
@@ -74,6 +75,7 @@ namespace CubeChallenge3D.Ads
             if (IsLimitReached(placement))
             {
                 return placement == RewardedAdPlacement.StageContinue
+                    || placement == RewardedAdPlacement.OutOfMovesPlus2
                     ? "Stage continue limit reached."
                     : "Daily ad limit reached.";
             }
@@ -102,6 +104,11 @@ namespace CubeChallenge3D.Ads
             if (placement == RewardedAdPlacement.DailyCoins)
             {
                 return Mathf.Max(0, Config.dailyCoinAdsMax - DailyCoinsUsed);
+            }
+
+            if (placement == RewardedAdPlacement.ShopCoinReward)
+            {
+                return Mathf.Max(0, Config.dailyCoinAdsMax - DailyShopCoinAdsUsed);
             }
 
             if (placement == RewardedAdPlacement.SolverBonusTicket)
@@ -152,6 +159,9 @@ namespace CubeChallenge3D.Ads
                     finished = true;
                     isShowingAd = false;
                     limitStore.RecordReward(placement);
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+                    Debug.Log($"[AdRewardApplied] placement={placement}, result=rewarded");
+#endif
                     onRewarded?.Invoke();
                     onCompleted?.Invoke(RewardedAdResult.Rewarded);
                 },
@@ -202,10 +212,22 @@ namespace CubeChallenge3D.Ads
 
         private bool IsLimitReached(RewardedAdPlacement placement)
         {
-            return placement == RewardedAdPlacement.DailyCoins
-                ? DailyCoinsUsed >= Config.dailyCoinAdsMax
-                : placement == RewardedAdPlacement.SolverBonusTicket
-                    && DailySolverTicketsUsed >= Config.dailySolverTicketAdsMax;
+            if (placement == RewardedAdPlacement.DailyCoins)
+            {
+                return DailyCoinsUsed >= Config.dailyCoinAdsMax;
+            }
+
+            if (placement == RewardedAdPlacement.ShopCoinReward)
+            {
+                return DailyShopCoinAdsUsed >= Config.dailyCoinAdsMax;
+            }
+
+            if (placement == RewardedAdPlacement.SolverBonusTicket)
+            {
+                return DailySolverTicketsUsed >= Config.dailySolverTicketAdsMax;
+            }
+
+            return false;
         }
 
         private static RewardedAdPlacement ToPlacement(RewardType type)
@@ -213,11 +235,11 @@ namespace CubeChallenge3D.Ads
             switch (type)
             {
                 case RewardType.ContinueStage:
-                    return RewardedAdPlacement.StageContinue;
+                    return RewardedAdPlacement.OutOfMovesPlus2;
                 case RewardType.SolverExtraUse:
                     return RewardedAdPlacement.SolverBonusTicket;
                 default:
-                    return RewardedAdPlacement.DailyCoins;
+                    return RewardedAdPlacement.ShopCoinReward;
             }
         }
     }

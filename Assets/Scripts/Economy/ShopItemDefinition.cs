@@ -15,11 +15,12 @@ namespace CubeChallenge3D.Economy
         {
             return new List<ShopItemDefinition>
             {
-                new ShopItemDefinition { itemType = StageAssistItemType.Undo, coinPrice = 50, quantity = 1 },
-                new ShopItemDefinition { itemType = StageAssistItemType.MovePlus1, coinPrice = 100, quantity = 1 },
-                new ShopItemDefinition { itemType = StageAssistItemType.MovePlus2, coinPrice = 180, quantity = 1 },
-                new ShopItemDefinition { itemType = StageAssistItemType.MovePlus3, coinPrice = 250, quantity = 1 },
-                new ShopItemDefinition { itemType = StageAssistItemType.SolverTicket, coinPrice = 250, quantity = 1 }
+                new ShopItemDefinition { itemType = StageAssistItemType.Undo, coinPrice = EconomyBalanceConfig.UndoCoinPrice, quantity = 1 },
+                new ShopItemDefinition { itemType = StageAssistItemType.MovePlus1, coinPrice = EconomyBalanceConfig.MovePlus1CoinPrice, quantity = 1 },
+                new ShopItemDefinition { itemType = StageAssistItemType.MovePlus2, coinPrice = EconomyBalanceConfig.MovePlus2CoinPrice, quantity = 1 },
+                new ShopItemDefinition { itemType = StageAssistItemType.MovePlus3, coinPrice = EconomyBalanceConfig.MovePlus3CoinPrice, quantity = 1 },
+                new ShopItemDefinition { itemType = StageAssistItemType.SolverTicket, coinPrice = EconomyBalanceConfig.SolverTicketCoinPrice, quantity = 1 },
+                new ShopItemDefinition { itemType = StageAssistItemType.NicknameTicket, coinPrice = EconomyBalanceConfig.NicknameTicketCoinPrice, quantity = 1 }
             };
         }
     }

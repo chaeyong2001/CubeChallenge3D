@@ -15,19 +15,23 @@ namespace CubeChallenge3D.UI.Solver.Playback
 {
     public sealed class SolverPlaybackPanelUI
     {
-        private readonly GameObject root;
-        private readonly Canvas canvas;
-        private readonly RawImage cubeImage;
-        private readonly Text titleText;
-        private readonly Text statusText;
-        private readonly Text moveText;
-        private readonly Text progressText;
-        private readonly Text guideText;
-        private readonly Button previousButton;
-        private readonly Button nextButton;
-        private readonly Button autoButton;
-        private readonly Button pauseButton;
-        private readonly Button resetButton;
+        private GameObject root;
+        private Canvas canvas;
+        private RawImage cubeImage;
+        private Text titleText;
+        private Text statusText;
+        private Text moveText;
+        private Text progressText;
+        private Text guideText;
+        private Button previousButton;
+        private Button nextButton;
+        private Button autoButton;
+        private Button pauseButton;
+        private Button resetButton;
+        private Button backButton;
+        private bool embeddedMode;
+        private Action embeddedBackAction;
+        private bool useCompactEmbeddedLayout;
 
         private RenderTexture renderTexture;
         private GameObject sceneRoot;
@@ -56,13 +60,65 @@ namespace CubeChallenge3D.UI.Solver.Playback
         private Coroutine autoRoutine;
         private Coroutine cameraTransitionRoutine;
         private const float CameraTransitionDuration = 0.7f;
-        private readonly MonoBehaviourHost host;
+        private MonoBehaviourHost host;
+
+        private struct EmbeddedLayoutConfig
+        {
+            public Vector2 TitlePosition;
+            public Vector2 TitleSize;
+            public Vector2 CubeAreaPosition;
+            public Vector2 CubeAreaSize;
+            public Vector2 CurrentMoveTextPosition;
+            public Vector2 CurrentMoveTextSize;
+            public Vector2 MoveProgressTextPosition;
+            public Vector2 MoveProgressTextSize;
+            public Vector2 PlaybackButtonSize;
+            public Vector2 PreviousButtonPosition;
+            public Vector2 NextButtonPosition;
+            public Vector2 AutoPlayButtonPosition;
+            public Vector2 BackButtonPosition;
+
+            public static EmbeddedLayoutConfig Default => new EmbeddedLayoutConfig
+            {
+                TitlePosition = new Vector2(0f, -38f),
+                TitleSize = new Vector2(620f, 48f),
+                CubeAreaPosition = new Vector2(0f, -110f),
+                CubeAreaSize = new Vector2(860f, 860f),
+                CurrentMoveTextPosition = new Vector2(0f, -1010f),
+                CurrentMoveTextSize = new Vector2(820f, 54f),
+                MoveProgressTextPosition = new Vector2(0f, -1065f),
+                MoveProgressTextSize = new Vector2(820f, 40f),
+                PlaybackButtonSize = new Vector2(430f, 94f),
+                PreviousButtonPosition = new Vector2(-240f, -1162f),
+                NextButtonPosition = new Vector2(240f, -1162f),
+                AutoPlayButtonPosition = new Vector2(-240f, -1282f),
+                BackButtonPosition = new Vector2(240f, -1282f)
+            };
+
+            public static EmbeddedLayoutConfig CompactLesson => new EmbeddedLayoutConfig
+            {
+                TitlePosition = new Vector2(0f, -24f),
+                TitleSize = new Vector2(720f, 48f),
+                CubeAreaPosition = new Vector2(0f, -88f),
+                CubeAreaSize = new Vector2(620f, 560f),
+                CurrentMoveTextPosition = new Vector2(0f, -660f),
+                CurrentMoveTextSize = new Vector2(820f, 50f),
+                MoveProgressTextPosition = new Vector2(0f, -710f),
+                MoveProgressTextSize = new Vector2(820f, 38f),
+                PlaybackButtonSize = new Vector2(360f, 76f),
+                PreviousButtonPosition = new Vector2(-205f, -795f),
+                NextButtonPosition = new Vector2(205f, -795f),
+                AutoPlayButtonPosition = new Vector2(-205f, -888f),
+                BackButtonPosition = new Vector2(205f, -888f)
+            };
+        }
 
         public SolverPlaybackPanelUI(
             Transform parent,
             string panelTitle = "Solver Playback",
             string orientationGuide = "Follow using the same orientation you entered. Keep Front, Top, and Right fixed.")
         {
+            embeddedMode = false;
             canvas = RuntimeUiFactory.CreateCanvas(parent, "SolverPlaybackCanvas", 1520);
             root = canvas.gameObject;
             host = root.AddComponent<MonoBehaviourHost>();
@@ -75,6 +131,36 @@ namespace CubeChallenge3D.UI.Solver.Playback
                 Vector2.zero,
                 new Vector2(900f, 1040f));
 
+            InitializeUi(panel, panelTitle, orientationGuide);
+            Hide();
+        }
+
+        public SolverPlaybackPanelUI(
+            RectTransform parent,
+            Action backAction,
+            string panelTitle = "Solver Playback",
+            string orientationGuide = "Follow using the same orientation you entered. Keep Front, Top, and Right fixed.",
+            bool compactEmbeddedLayout = false)
+        {
+            embeddedMode = true;
+            embeddedBackAction = backAction;
+            useCompactEmbeddedLayout = compactEmbeddedLayout;
+            root = new GameObject("SolverPlaybackInlineRoot", typeof(RectTransform));
+            root.transform.SetParent(parent, false);
+            RectTransform panel = root.GetComponent<RectTransform>();
+            panel.anchorMin = Vector2.zero;
+            panel.anchorMax = Vector2.one;
+            panel.pivot = new Vector2(0.5f, 0.5f);
+            panel.offsetMin = Vector2.zero;
+            panel.offsetMax = Vector2.zero;
+            host = root.AddComponent<MonoBehaviourHost>();
+
+            InitializeUi(panel, panelTitle, orientationGuide);
+            Hide();
+        }
+
+        private void InitializeUi(RectTransform panel, string panelTitle, string orientationGuide)
+        {
             titleText = RuntimeUiFactory.CreateText(panel, "Title", panelTitle, 32, TextAnchor.UpperCenter);
             titleText.rectTransform.anchorMin = new Vector2(0f, 1f);
             titleText.rectTransform.anchorMax = new Vector2(1f, 1f);
@@ -82,8 +168,8 @@ namespace CubeChallenge3D.UI.Solver.Playback
             titleText.rectTransform.anchoredPosition = new Vector2(0f, -40f);
             titleText.rectTransform.sizeDelta = new Vector2(-80f, 46f);
 
-            Button backButton = RuntimeUiFactory.CreateButton(panel, "BackButton", "Back", new Vector2(330f, 930f), new Vector2(150f, 54f));
-            backButton.onClick.AddListener(Hide);
+            backButton = RuntimeUiFactory.CreateButton(panel, "BackButton", "Back", new Vector2(330f, 930f), new Vector2(150f, 54f));
+            backButton.onClick.AddListener(HandleBack);
 
             cubeImage = CreateCubeImage(panel);
 
@@ -121,7 +207,7 @@ namespace CubeChallenge3D.UI.Solver.Playback
 
             previousButton.onClick.AddListener(PreviousMove);
             nextButton.onClick.AddListener(NextMove);
-            autoButton.onClick.AddListener(StartAutoPlay);
+            autoButton.onClick.AddListener(ToggleAutoPlay);
             pauseButton.onClick.AddListener(PauseAutoPlay);
             resetButton.onClick.AddListener(ResetPlayback);
 
@@ -135,7 +221,11 @@ namespace CubeChallenge3D.UI.Solver.Playback
             BuildScene();
             PlaybackOrbitDragHandle dragHandle = cubeImage.gameObject.AddComponent<PlaybackOrbitDragHandle>();
             dragHandle.Initialize(cubeController, renderCamera);
-            Hide();
+
+            if (embeddedMode)
+            {
+                ApplyEmbeddedLayout();
+            }
         }
 
         public void Show(SolverSolution solution)
@@ -154,7 +244,10 @@ namespace CubeChallenge3D.UI.Solver.Playback
             if (!TryLoadSolution(solution, out string error))
             {
                 root.SetActive(true);
-                canvas.enabled = true;
+                if (canvas != null)
+                {
+                    canvas.enabled = true;
+                }
                 statusText.text = error;
                 moveText.text = "No playback";
                 progressText.text = "0 / 0";
@@ -163,7 +256,10 @@ namespace CubeChallenge3D.UI.Solver.Playback
             }
 
             root.SetActive(true);
-            canvas.enabled = true;
+            if (canvas != null)
+            {
+                canvas.enabled = true;
+            }
             cubeController.SetStateInstant(sourceState, true);
             ApplyCameraPosition();
             if (cubeController.ViewRoot != null)
@@ -229,12 +325,26 @@ namespace CubeChallenge3D.UI.Solver.Playback
         {
             StopAutoPlay();
             StopCameraTransition();
-            canvas.enabled = false;
+            if (canvas != null)
+            {
+                canvas.enabled = false;
+            }
             root.SetActive(false);
             if (sceneRoot != null)
             {
                 sceneRoot.SetActive(false);
             }
+        }
+
+        private void HandleBack()
+        {
+            if (embeddedMode)
+            {
+                embeddedBackAction?.Invoke();
+                return;
+            }
+
+            Hide();
         }
 
         private RawImage CreateCubeImage(RectTransform parent)
@@ -402,6 +512,17 @@ namespace CubeChallenge3D.UI.Solver.Playback
             UpdateView();
         }
 
+        private void ToggleAutoPlay()
+        {
+            if (autoPlaying)
+            {
+                PauseAutoPlay();
+                return;
+            }
+
+            StartAutoPlay();
+        }
+
         private void PauseAutoPlay()
         {
             StopAutoPlay();
@@ -431,6 +552,70 @@ namespace CubeChallenge3D.UI.Solver.Playback
             {
                 host.StopCoroutine(autoRoutine);
                 autoRoutine = null;
+            }
+        }
+
+        private void ApplyEmbeddedLayout()
+        {
+            EmbeddedLayoutConfig layout = useCompactEmbeddedLayout
+                ? EmbeddedLayoutConfig.CompactLesson
+                : EmbeddedLayoutConfig.Default;
+            SetTopAnchored(titleText.rectTransform, layout.TitlePosition, layout.TitleSize);
+            SetTopAnchored(cubeImage.rectTransform, layout.CubeAreaPosition, layout.CubeAreaSize);
+            SetCenterTopAnchored(moveText.rectTransform, layout.CurrentMoveTextPosition, layout.CurrentMoveTextSize);
+            SetCenterTopAnchored(progressText.rectTransform, layout.MoveProgressTextPosition, layout.MoveProgressTextSize);
+            SetCenterTopAnchored(previousButton.GetComponent<RectTransform>(), layout.PreviousButtonPosition, layout.PlaybackButtonSize);
+            SetCenterTopAnchored(nextButton.GetComponent<RectTransform>(), layout.NextButtonPosition, layout.PlaybackButtonSize);
+            SetCenterTopAnchored(autoButton.GetComponent<RectTransform>(), layout.AutoPlayButtonPosition, layout.PlaybackButtonSize);
+            SetCenterTopAnchored(backButton.GetComponent<RectTransform>(), layout.BackButtonPosition, layout.PlaybackButtonSize);
+
+            guideText.gameObject.SetActive(false);
+            statusText.gameObject.SetActive(false);
+            autoButton.gameObject.SetActive(true);
+            pauseButton.gameObject.SetActive(false);
+            resetButton.gameObject.SetActive(false);
+            StyleEmbeddedButton(previousButton);
+            StyleEmbeddedButton(nextButton);
+            StyleEmbeddedButton(autoButton);
+            StyleEmbeddedButton(backButton);
+        }
+
+        private static void SetTopAnchored(RectTransform rect, Vector2 position, Vector2 size)
+        {
+            rect.anchorMin = new Vector2(0.5f, 1f);
+            rect.anchorMax = new Vector2(0.5f, 1f);
+            rect.pivot = new Vector2(0.5f, 1f);
+            rect.anchoredPosition = position;
+            rect.sizeDelta = size;
+        }
+
+        private static void SetCenterTopAnchored(RectTransform rect, Vector2 position, Vector2 size)
+        {
+            rect.anchorMin = new Vector2(0.5f, 1f);
+            rect.anchorMax = new Vector2(0.5f, 1f);
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.anchoredPosition = position;
+            rect.sizeDelta = size;
+        }
+
+        private static void StyleEmbeddedButton(Button button)
+        {
+            if (button == null)
+            {
+                return;
+            }
+
+            Image image = button.GetComponent<Image>();
+            if (image != null)
+            {
+                image.color = new Color(0.12f, 0.35f, 0.96f, 1f);
+            }
+
+            Text label = button.GetComponentInChildren<Text>();
+            if (label != null)
+            {
+                label.fontStyle = FontStyle.Bold;
+                label.color = Color.white;
             }
         }
 
@@ -487,9 +672,10 @@ namespace CubeChallenge3D.UI.Solver.Playback
 
             previousButton.interactable = hasMoves && !busy && moveIndex > 0;
             nextButton.interactable = hasMoves && !busy && moveIndex < moves.Count;
-            autoButton.interactable = hasMoves && !busy && !autoPlaying && moveIndex < moves.Count;
+            autoButton.interactable = hasMoves && !busy && moveIndex < moves.Count;
             pauseButton.interactable = autoPlaying;
             resetButton.interactable = !busy;
+            SetButtonLabel(autoButton, autoPlaying ? "Pause" : "Auto Play");
         }
 
         private void SetButtons(bool interactable)
@@ -499,6 +685,15 @@ namespace CubeChallenge3D.UI.Solver.Playback
             autoButton.interactable = interactable;
             pauseButton.interactable = interactable;
             resetButton.interactable = interactable;
+        }
+
+        private static void SetButtonLabel(Button button, string label)
+        {
+            Text text = button != null ? button.GetComponentInChildren<Text>() : null;
+            if (text != null)
+            {
+                text.text = label;
+            }
         }
 
         private void AddPlaybackFaceLabels()

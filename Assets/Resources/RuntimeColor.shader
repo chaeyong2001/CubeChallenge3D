@@ -65,6 +65,7 @@ Shader "CubeChallenge3D/RuntimeColor"
             half4 Frag(Varyings input) : SV_Target
             {
                 half4 textureColor = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, input.uv);
+                clip(textureColor.a - 0.05h);
                 return textureColor * _BaseColor + _EmissionColor;
             }
             ENDHLSL

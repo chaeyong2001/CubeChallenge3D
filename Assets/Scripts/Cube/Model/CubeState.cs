@@ -81,10 +81,10 @@ namespace CubeChallenge3D.Cube.Model
 
         public void ApplyMove(CubeMove move)
         {
-            int clockwiseTurns = move.QuarterTurns == -1 ? 3 : move.QuarterTurns;
-            for (int i = 0; i < clockwiseTurns; i++)
+            int positiveAxisTurns = move.AxisQuarterTurns == -1 ? 3 : move.AxisQuarterTurns;
+            for (int i = 0; i < positiveAxisTurns; i++)
             {
-                ApplyClockwiseFaceTurn(move.Face);
+                ApplyPositiveLayerTurn(move.Axis, move.LayerIndex);
             }
         }
 
@@ -150,9 +150,9 @@ namespace CubeChallenge3D.Cube.Model
             }
         }
 
-        private void ApplyClockwiseFaceTurn(CubeFace face)
+        private void ApplyPositiveLayerTurn(CubeAxis rotationAxis, int layerIndex)
         {
-            IntVector3 axis = GetFaceNormal(face);
+            IntVector3 axis = GetAxisVector(rotationAxis);
             var next = (CubeColor[,,])facelets.Clone();
 
             foreach (CubeFace sourceFace in Enum.GetValues(typeof(CubeFace)))
@@ -162,13 +162,13 @@ namespace CubeChallenge3D.Cube.Model
                     for (int col = 0; col < FaceSize; col++)
                     {
                         GetFaceletTransform(sourceFace, row, col, out IntVector3 position, out IntVector3 normal);
-                        if (IntVector3.Dot(position, axis) != 1)
+                        if (GetAxisValue(position, rotationAxis) != layerIndex)
                         {
                             continue;
                         }
 
-                        IntVector3 rotatedPosition = RotateClockwise(position, axis);
-                        IntVector3 rotatedNormal = RotateClockwise(normal, axis);
+                        IntVector3 rotatedPosition = RotatePositive(position, axis);
+                        IntVector3 rotatedNormal = RotatePositive(normal, axis);
                         GetFaceletIndex(rotatedPosition, rotatedNormal, out CubeFace targetFace, out int targetRow, out int targetCol);
                         next[(int)targetFace, targetRow, targetCol] = facelets[(int)sourceFace, row, col];
                     }
@@ -176,6 +176,28 @@ namespace CubeChallenge3D.Cube.Model
             }
 
             Array.Copy(next, facelets, next.Length);
+        }
+
+        private static IntVector3 GetAxisVector(CubeAxis axis)
+        {
+            switch (axis)
+            {
+                case CubeAxis.X: return new IntVector3(1, 0, 0);
+                case CubeAxis.Y: return new IntVector3(0, 1, 0);
+                case CubeAxis.Z: return new IntVector3(0, 0, 1);
+                default: throw new ArgumentOutOfRangeException(nameof(axis), axis, null);
+            }
+        }
+
+        private static int GetAxisValue(IntVector3 value, CubeAxis axis)
+        {
+            switch (axis)
+            {
+                case CubeAxis.X: return value.X;
+                case CubeAxis.Y: return value.Y;
+                case CubeAxis.Z: return value.Z;
+                default: throw new ArgumentOutOfRangeException(nameof(axis), axis, null);
+            }
         }
 
         private void FillFace(CubeFace face, CubeColor color)
@@ -281,11 +303,11 @@ namespace CubeChallenge3D.Cube.Model
             throw new InvalidOperationException("Invalid facelet normal.");
         }
 
-        private static IntVector3 RotateClockwise(IntVector3 value, IntVector3 axis)
+        private static IntVector3 RotatePositive(IntVector3 value, IntVector3 axis)
         {
             IntVector3 cross = IntVector3.Cross(axis, value);
             int dot = IntVector3.Dot(axis, value);
-            return (-cross) + (axis * dot);
+            return cross + (axis * dot);
         }
 
         private readonly struct IntVector3

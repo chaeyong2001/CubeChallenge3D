@@ -11,6 +11,8 @@ namespace CubeChallenge3D.Cube.Utils
                 && IsFourTurnsIdentity(CubeFace.Up)
                 && AreAllFourTurnsIdentity()
                 && AreAllMoveInversePairsIdentity()
+                && AreAllMiddleFourTurnsIdentity()
+                && AreAllMiddleMoveInversePairsIdentity()
                 && IsScrambleInverseIdentity()
                 && IsSolvedColorCountValid()
                 && IsSerializationRoundTripValid();
@@ -38,6 +40,44 @@ namespace CubeChallenge3D.Cube.Utils
                 state.ApplyMove(move);
                 state.ApplyMove(MoveUtility.Inverse(move));
                 if (!state.Equals(CubeState.CreateSolved()))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        public static bool AreAllMiddleFourTurnsIdentity()
+        {
+            foreach (CubeAxis axis in Enum.GetValues(typeof(CubeAxis)))
+            {
+                CubeState solved = CubeState.CreateSolved();
+                CubeState state = solved.Clone();
+                CubeMove move = CubeMove.CreateLayer(axis, 0, 1);
+                for (int i = 0; i < 4; i++)
+                {
+                    state.ApplyMove(move);
+                }
+
+                if (!state.Equals(solved))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        public static bool AreAllMiddleMoveInversePairsIdentity()
+        {
+            foreach (CubeAxis axis in Enum.GetValues(typeof(CubeAxis)))
+            {
+                CubeState state = CubeState.CreateSolved();
+                CubeMove move = CubeMove.CreateLayer(axis, 0, 1);
+                state.ApplyMove(move);
+                state.ApplyMove(MoveUtility.Inverse(move));
+                if (!state.IsSolved())
                 {
                     return false;
                 }

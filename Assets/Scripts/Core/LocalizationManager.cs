@@ -29,7 +29,7 @@ namespace CubeChallenge3D.Core
                     { "target", "Target" },
                     { "solver", "Solver" },
                     { "solver_learn", "Solver & Learn" },
-                    { "records", "Records" },
+                    { "records", "World Records" },
                     { "shop", "Shop" },
                     { "rewards", "Rewards" },
                     { "coins", "Coins" },

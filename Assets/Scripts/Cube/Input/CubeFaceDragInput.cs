@@ -193,7 +193,7 @@ namespace CubeChallenge3D.Cube.Input
                 }
                 else
                 {
-                    LastInputIgnoredReason = "Layer cannot be converted to a supported outer move";
+                    LastInputIgnoredReason = "Layer cannot be converted to a supported move";
                 }
             }
             else

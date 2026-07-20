@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Text;
+using CubeChallenge3D.Audio;
 using CubeChallenge3D.Cube.Model;
 using CubeChallenge3D.Inventory;
 using CubeChallenge3D.Solver;
@@ -12,6 +13,7 @@ using CubeChallenge3D.Solver.Storage;
 using CubeChallenge3D.Stages.Assist;
 using CubeChallenge3D.UI.Common;
 using CubeChallenge3D.UI.Solver.Playback;
+using CubeChallenge3D.UI.Style;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
@@ -41,12 +43,33 @@ namespace CubeChallenge3D.UI.Solver
         private readonly Text statusText;
         private readonly Text resultText;
         private readonly Text debugText;
+        private readonly RectTransform titleRect;
+        private readonly RectTransform subtitleRect;
+        private readonly RectTransform backButtonRect;
+        private readonly RectTransform contentPanelRect;
+        private readonly RectTransform faceLabelRect;
+        private readonly RectTransform cubeBoardRect;
+        private readonly RectTransform previousButtonRect;
+        private readonly RectTransform nextButtonRect;
+        private readonly RectTransform resultBarRect;
+        private readonly RectTransform helperTextRect;
+        private readonly RectTransform validateButtonRect;
+        private readonly RectTransform clearButtonRect;
+        private readonly RectTransform solveButtonRect;
+        private readonly RectTransform play3DButtonRect;
+        private readonly RectTransform solverBackButtonRect;
+        private readonly RectTransform manualInputRoot;
         private readonly RectTransform gridRoot;
         private readonly RectTransform paletteRoot;
+        private readonly ManualSolverLayoutConfig layout = ManualSolverLayoutConfig.Default;
         private SolverInputCube3DView inputCube3DView;
         private SolverFaceGuideView faceGuideView;
         private SolverPlaybackPanelUI playbackPanel;
+        private Button validateButton;
+        private Button solveButton;
         private Button play3DButton;
+        private Text solverTicketCountText;
+        private Image solverTicketIconImage;
         private SolverInputState state;
         private SolverSolution lastSolution;
         private SolverRequest lastSolverRequest;
@@ -57,8 +80,15 @@ namespace CubeChallenge3D.UI.Solver
         private Vector3Int currentUpNormal = Vector3Int.up;
         private bool learnMode;
         private bool isSolving;
+        private bool validationAttemptedForCurrentInput;
+        private bool validationPassedForCurrentInput;
+        private bool solveAttemptedForCurrentInput;
+        private bool solutionReadyForCurrentInput;
 
         private const bool ShowDebugPanel = false;
+        private static readonly Color PanelNavy = new Color32(7, 21, 31, 255);
+        private static readonly Color GoldLine = new Color(1f, 0.67f, 0.08f, 1f);
+        private static readonly Color ResultBrown = new Color(0.55f, 0.30f, 0.05f, 0.96f);
         private static readonly string[] InternalFaceLabels = { "U", "R", "F", "D", "L", "B" };
         private static readonly string[] InternalFaceDisplayNames = { "Top", "Right", "Front", "Bottom", "Left", "Back" };
         private static readonly int[][] DiagnosticCornerFacelets =
@@ -113,6 +143,72 @@ namespace CubeChallenge3D.UI.Solver
             CubeColor.Green
         };
 
+        private struct ManualSolverLayoutConfig
+        {
+            public Vector2 TitlePosition;
+            public Vector2 TitleSize;
+            public Vector2 SubtitlePosition;
+            public Vector2 SubtitleSize;
+            public Vector2 BackButtonPosition;
+            public Vector2 BackButtonSize;
+            public Vector2 ContentPosition;
+            public Vector2 ContentSize;
+            public Vector2 FaceLabelPosition;
+            public Vector2 FaceLabelSize;
+            public Vector2 CubeBoardPosition;
+            public Vector2 CubeBoardSize;
+            public Vector2 PreviousButtonPosition;
+            public Vector2 NextButtonPosition;
+            public Vector2 FaceButtonSize;
+            public Vector2 ResultBarPosition;
+            public Vector2 ResultBarSize;
+            public Vector2 PalettePosition;
+            public Vector2 PaletteButtonSize;
+            public float PaletteGapX;
+            public float PaletteGapY;
+            public Vector2 HelperTextPosition;
+            public Vector2 HelperTextSize;
+            public Vector2 ActionButtonSize;
+            public Vector2 ValidateButtonPosition;
+            public Vector2 ClearButtonPosition;
+            public Vector2 SolveButtonPosition;
+            public Vector2 Play3DButtonPosition;
+            public Vector2 SolverBackButtonPosition;
+
+            public static ManualSolverLayoutConfig Default => new ManualSolverLayoutConfig
+            {
+                TitlePosition = new Vector2(0f, -292f),
+                TitleSize = new Vector2(800f, 92f),
+                SubtitlePosition = new Vector2(0f, -382f),
+                SubtitleSize = new Vector2(860f, 48f),
+                BackButtonPosition = new Vector2(420f, -328f),
+                BackButtonSize = new Vector2(92f, 84f),
+                ContentPosition = new Vector2(0f, -265.2f),
+                ContentSize = new Vector2(1040f, 1629.6f),
+                FaceLabelPosition = new Vector2(0f, -42f),
+                FaceLabelSize = new Vector2(320f, 48f),
+                CubeBoardPosition = new Vector2(0f, -88f),
+                CubeBoardSize = new Vector2(700f, 700f),
+                PreviousButtonPosition = new Vector2(-435f, -440f),
+                NextButtonPosition = new Vector2(435f, -440f),
+                FaceButtonSize = new Vector2(165f, 76f),
+                ResultBarPosition = new Vector2(0f, -835f),
+                ResultBarSize = new Vector2(850f, 74f),
+                PalettePosition = new Vector2(0f, -935f),
+                PaletteButtonSize = new Vector2(285f, 78f),
+                PaletteGapX = 28f,
+                PaletteGapY = 22f,
+                HelperTextPosition = new Vector2(0f, -1145f),
+                HelperTextSize = new Vector2(860f, 42f),
+                ActionButtonSize = new Vector2(430f, 94f),
+                ValidateButtonPosition = new Vector2(-240f, -1255f),
+                ClearButtonPosition = new Vector2(240f, -1255f),
+                SolveButtonPosition = new Vector2(-240f, -1375f),
+                Play3DButtonPosition = new Vector2(240f, -1375f),
+                SolverBackButtonPosition = new Vector2(0f, -1495f)
+            };
+        }
+
         public SolverPanelUI(Transform parent)
         {
             state = SolverInputState.CreateEmpty();
@@ -121,28 +217,46 @@ namespace CubeChallenge3D.UI.Solver
             root = canvas.gameObject;
             solverCanvas = canvas;
             solverRaycaster = root.GetComponent<GraphicRaycaster>();
+            CasualUIFactory.CreateBackdrop(root.transform, "SolverBackdrop", true, false);
             RectTransform panel = RuntimeUiFactory.CreatePanel(
                 root.transform,
                 "SolverPanel",
-                new Vector2(0.5f, 0.5f),
-                new Vector2(0.5f, 0.5f),
                 Vector2.zero,
-                new Vector2(920f, 1040f));
+                Vector2.zero,
+                Vector2.zero,
+                Vector2.zero);
+            panel.anchorMin = Vector2.zero;
+            panel.anchorMax = Vector2.one;
+            panel.offsetMin = Vector2.zero;
+            panel.offsetMax = Vector2.zero;
+            panel.transform.SetAsLastSibling();
+            Image panelImage = panel.GetComponent<Image>();
+            if (panelImage != null)
+            {
+                panelImage.color = Color.clear;
+                panelImage.raycastTarget = false;
+            }
 
-            AddDragBar(panel);
-            AddResizeHandle(panel);
+            titleText = RuntimeUiFactory.CreateText(panel, "Title", "Manual Solver", 58, TextAnchor.MiddleCenter);
+            titleText.fontStyle = FontStyle.Bold;
+            titleText.color = new Color(1f, 0.78f, 0.22f, 1f);
+            titleRect = titleText.rectTransform;
+            ApplyTextDepth(titleText, new Color(0f, 0f, 0f, 0.58f), new Vector2(0f, -3f));
 
-            titleText = RuntimeUiFactory.CreateText(panel, "Title", "Manual Solver", 30, TextAnchor.UpperCenter);
-            titleText.rectTransform.anchorMin = new Vector2(0f, 1f);
-            titleText.rectTransform.anchorMax = new Vector2(1f, 1f);
-            titleText.rectTransform.pivot = new Vector2(0.5f, 1f);
-            titleText.rectTransform.anchoredPosition = new Vector2(0f, -56f);
-            titleText.rectTransform.sizeDelta = new Vector2(-100f, 42f);
+            Text subtitleText = RuntimeUiFactory.CreateText(panel, "Subtitle", "Select a color, then enter the stickers.", 28, TextAnchor.MiddleCenter);
+            subtitleText.color = new Color(0.92f, 0.92f, 0.96f, 1f);
+            subtitleRect = subtitleText.rectTransform;
+
+            Button manualButton = RuntimeUiFactory.CreateButton(panel, "ManualSolverButton", "Manual Solver", Vector2.zero, Vector2.zero);
+            Button learnButton = RuntimeUiFactory.CreateButton(panel, "LearnBasicsButton", "Learn Basics", Vector2.zero, Vector2.zero);
+            manualButton.gameObject.SetActive(false);
+            learnButton.gameObject.SetActive(false);
+            Button backButton = RuntimeUiFactory.CreateButton(panel, "BackButton", "<", Vector2.zero, layout.BackButtonSize);
+            backButtonRect = backButton.GetComponent<RectTransform>();
+            SetButtonLabel(backButton, "<", 44);
             titleText.gameObject.SetActive(false);
-
-            Button manualButton = RuntimeUiFactory.CreateButton(panel, "ManualSolverButton", "Manual Solver", new Vector2(-250f, 944f), new Vector2(220f, 50f));
-            Button learnButton = RuntimeUiFactory.CreateButton(panel, "LearnBasicsButton", "Learn Basics", new Vector2(0f, 944f), new Vector2(220f, 50f));
-            Button backButton = RuntimeUiFactory.CreateButton(panel, "BackButton", "Back", new Vector2(250f, 944f), new Vector2(170f, 50f));
+            subtitleText.gameObject.SetActive(false);
+            backButton.gameObject.SetActive(false);
             manualButton.onClick.AddListener(() => SetLearnMode(false));
             learnButton.onClick.AddListener(() => SetLearnMode(true));
             backButton.onClick.AddListener(Hide);
@@ -150,59 +264,103 @@ namespace CubeChallenge3D.UI.Solver
             faceGuideView = new GameObject("SolverFaceGuideView").AddComponent<SolverFaceGuideView>();
             faceGuideView.Initialize(panel);
 
-            currentFaceText = RuntimeUiFactory.CreateText(panel, "CurrentFace", string.Empty, 24, TextAnchor.UpperCenter);
-            currentFaceText.rectTransform.anchorMin = new Vector2(0f, 1f);
-            currentFaceText.rectTransform.anchorMax = new Vector2(1f, 1f);
-            currentFaceText.rectTransform.pivot = new Vector2(0.5f, 1f);
-            currentFaceText.rectTransform.anchoredPosition = new Vector2(0f, -122f);
-            currentFaceText.rectTransform.sizeDelta = new Vector2(-260f, 34f);
+            contentPanelRect = RuntimeUiFactory.CreatePanel(
+                panel,
+                "ManualSolverContentPanel",
+                new Vector2(0.5f, 1f),
+                new Vector2(0.5f, 1f),
+                layout.ContentPosition,
+                layout.ContentSize);
+            Image contentImage = contentPanelRect.GetComponent<Image>();
+            if (contentImage != null)
+            {
+                contentImage.color = PanelNavy;
+            }
+            AddOutline(contentPanelRect.gameObject, GoldLine, new Vector2(3f, -3f));
 
-            instructionText = RuntimeUiFactory.CreateText(panel, "InputInstruction", "Select a color, then tap stickers on the current face.", 15, TextAnchor.UpperCenter);
-            instructionText.rectTransform.anchorMin = new Vector2(0f, 1f);
-            instructionText.rectTransform.anchorMax = new Vector2(1f, 1f);
-            instructionText.rectTransform.pivot = new Vector2(0.5f, 1f);
-            instructionText.rectTransform.anchoredPosition = new Vector2(0f, -158f);
-            instructionText.rectTransform.sizeDelta = new Vector2(-260f, 30f);
+            manualInputRoot = new GameObject("ManualInputRoot", typeof(RectTransform)).GetComponent<RectTransform>();
+            manualInputRoot.SetParent(contentPanelRect, false);
+            manualInputRoot.anchorMin = Vector2.zero;
+            manualInputRoot.anchorMax = Vector2.one;
+            manualInputRoot.pivot = new Vector2(0.5f, 0.5f);
+            manualInputRoot.offsetMin = Vector2.zero;
+            manualInputRoot.offsetMax = Vector2.zero;
 
-            CreateFaceButtons(panel);
+            currentFaceText = RuntimeUiFactory.CreateText(manualInputRoot, "CurrentFace", string.Empty, 24, TextAnchor.MiddleCenter);
+            currentFaceText.fontStyle = FontStyle.Bold;
+            currentFaceText.color = new Color(1f, 0.84f, 0.22f, 1f);
+            faceLabelRect = currentFaceText.rectTransform;
 
-            gridRoot = CreateGridRoot(panel);
+            instructionText = RuntimeUiFactory.CreateText(manualInputRoot, "InputInstruction", "Select a color, then enter the stickers.", 24, TextAnchor.MiddleCenter);
+            instructionText.color = new Color(0.92f, 0.92f, 0.96f, 1f);
+            helperTextRect = instructionText.rectTransform;
+
+            CreateFaceButtons(manualInputRoot);
+
+            gridRoot = CreateGridRoot(manualInputRoot);
             CreateCellButtons();
             gridRoot.gameObject.SetActive(false);
 
             inputCube3DView = new GameObject("SolverInputCube3DView").AddComponent<SolverInputCube3DView>();
             inputCube3DView.Initialize(
-                panel,
+                manualInputRoot,
                 state,
                 () => (CubeColor)state.selectedColorIndex,
                 OnInputCubeFaceChanged,
                 OnInputCubeChanged);
+            cubeBoardRect = inputCube3DView.GetComponent<RectTransform>();
 
-            paletteRoot = CreatePaletteRoot(panel);
+            paletteRoot = CreatePaletteRoot(manualInputRoot);
             CreatePaletteButtons();
 
-            Button previousButton = RuntimeUiFactory.CreateButton(panel, "PreviousFaceButton", "Previous", new Vector2(-370f, 560f), new Vector2(150f, 50f));
-            Button nextButton = RuntimeUiFactory.CreateButton(panel, "NextFaceButton", "Next", new Vector2(370f, 560f), new Vector2(150f, 50f));
+            Button previousButton = RuntimeUiFactory.CreateButton(manualInputRoot, "PreviousFaceButton", "Previous", Vector2.zero, layout.FaceButtonSize);
+            Button nextButton = RuntimeUiFactory.CreateButton(manualInputRoot, "NextFaceButton", "Next", Vector2.zero, layout.FaceButtonSize);
+            previousButtonRect = previousButton.GetComponent<RectTransform>();
+            nextButtonRect = nextButton.GetComponent<RectTransform>();
             previousButton.onClick.AddListener(PreviousFace);
             nextButton.onClick.AddListener(NextFace);
 
-            validationText = RuntimeUiFactory.CreateText(panel, "ValidationSummary", string.Empty, 15, TextAnchor.UpperCenter);
-            validationText.rectTransform.anchorMin = new Vector2(0f, 0f);
-            validationText.rectTransform.anchorMax = new Vector2(1f, 0f);
-            validationText.rectTransform.pivot = new Vector2(0.5f, 0f);
-            validationText.rectTransform.anchoredPosition = new Vector2(0f, 168f);
-            validationText.rectTransform.sizeDelta = new Vector2(-80f, 36f);
+            validationText = RuntimeUiFactory.CreateText(manualInputRoot, "ValidationSummary", string.Empty, 15, TextAnchor.MiddleCenter);
+            validationText.gameObject.SetActive(false);
 
-            Button validateButton = RuntimeUiFactory.CreateButton(panel, "ValidateButton", "Validate", new Vector2(-300f, 92f), new Vector2(160f, 48f));
-            Button resetButton = RuntimeUiFactory.CreateButton(panel, "ResetSolvedButton", "Reset Solved", new Vector2(-112f, 92f), new Vector2(180f, 48f));
-            Button clearButton = RuntimeUiFactory.CreateButton(panel, "ClearButton", "Clear", new Vector2(86f, 92f), new Vector2(140f, 48f));
-            Button saveButton = RuntimeUiFactory.CreateButton(panel, "SaveButton", "Save", new Vector2(254f, 92f), new Vector2(140f, 48f));
-            Button loadButton = RuntimeUiFactory.CreateButton(panel, "LoadButton", "Load", new Vector2(-270f, 34f), new Vector2(150f, 48f));
-            Button solveButton = RuntimeUiFactory.CreateButton(panel, "SolveButton", "Solve", new Vector2(-92f, 34f), new Vector2(150f, 48f));
-            play3DButton = RuntimeUiFactory.CreateButton(panel, "Play3DButton", "Play 3D", new Vector2(86f, 34f), new Vector2(150f, 48f));
-            Button debugButton = RuntimeUiFactory.CreateButton(panel, "SolverDebugButton", "Debug", new Vector2(264f, 34f), new Vector2(150f, 48f));
+            RectTransform resultBar = RuntimeUiFactory.CreatePanel(
+                manualInputRoot,
+                "ResultBar",
+                new Vector2(0.5f, 1f),
+                new Vector2(0.5f, 0.5f),
+                layout.ResultBarPosition,
+                layout.ResultBarSize);
+            resultBarRect = resultBar;
+            Image resultImage = resultBar.GetComponent<Image>();
+            if (resultImage != null)
+            {
+                resultImage.color = ResultBrown;
+            }
+            AddOutline(resultBar.gameObject, new Color(1f, 0.65f, 0.13f, 0.9f), new Vector2(1.5f, -1.5f));
+
+            resultText = RuntimeUiFactory.CreateText(resultBar, "SolverResult", "Result: Not solved yet.", 24, TextAnchor.MiddleCenter);
+            resultText.fontStyle = FontStyle.Bold;
+            resultText.horizontalOverflow = HorizontalWrapMode.Wrap;
+            resultText.verticalOverflow = VerticalWrapMode.Truncate;
+            ApplyTextDepth(resultText, new Color(0f, 0f, 0f, 0.56f), new Vector2(1.5f, -1.5f));
+
+            validateButton = RuntimeUiFactory.CreateButton(manualInputRoot, "ValidateButton", "Validate", Vector2.zero, layout.ActionButtonSize);
+            Button resetButton = RuntimeUiFactory.CreateButton(manualInputRoot, "ResetSolvedButton", "Reset Solved", Vector2.zero, Vector2.zero);
+            Button clearButton = RuntimeUiFactory.CreateButton(manualInputRoot, "ClearButton", "Clear", Vector2.zero, layout.ActionButtonSize);
+            Button saveButton = RuntimeUiFactory.CreateButton(manualInputRoot, "SaveButton", "Save", Vector2.zero, Vector2.zero);
+            Button loadButton = RuntimeUiFactory.CreateButton(manualInputRoot, "LoadButton", "Load", Vector2.zero, Vector2.zero);
+            solveButton = RuntimeUiFactory.CreateButton(manualInputRoot, "SolveButton", "Solve", Vector2.zero, layout.ActionButtonSize);
+            play3DButton = RuntimeUiFactory.CreateButton(manualInputRoot, "Play3DButton", "Play 3D", Vector2.zero, layout.ActionButtonSize);
+            Button solverBackButton = RuntimeUiFactory.CreateButton(manualInputRoot, "ManualSolverBackButton", "Back", Vector2.zero, layout.ActionButtonSize);
+            Button debugButton = RuntimeUiFactory.CreateButton(manualInputRoot, "SolverDebugButton", "Debug", Vector2.zero, Vector2.zero);
+            validateButtonRect = validateButton.GetComponent<RectTransform>();
+            clearButtonRect = clearButton.GetComponent<RectTransform>();
+            solveButtonRect = solveButton.GetComponent<RectTransform>();
+            play3DButtonRect = play3DButton.GetComponent<RectTransform>();
+            solverBackButtonRect = solverBackButton.GetComponent<RectTransform>();
+            CreateSolverTicketCountContent(solveButtonRect);
             debugButton.gameObject.SetActive(ShowDebugPanel && (Application.isEditor || Debug.isDebugBuild));
-            Button closeButton = RuntimeUiFactory.CreateButton(panel, "CloseButton", "Close", new Vector2(264f, 20f), new Vector2(150f, 48f));
+            Button closeButton = RuntimeUiFactory.CreateButton(manualInputRoot, "CloseButton", "Close", Vector2.zero, Vector2.zero);
             validateButton.onClick.AddListener(Validate);
             resetButton.onClick.AddListener(ResetSolved);
             clearButton.onClick.AddListener(ClearInput);
@@ -211,49 +369,36 @@ namespace CubeChallenge3D.UI.Solver
             solveButton.onClick.AddListener(Solve);
             debugButton.onClick.AddListener(ShowSolverDebugReport);
             play3DButton.onClick.AddListener(ShowPlayback);
+            solverBackButton.onClick.AddListener(Hide);
             closeButton.onClick.AddListener(Hide);
+            resetButton.gameObject.SetActive(false);
+            saveButton.gameObject.SetActive(false);
+            loadButton.gameObject.SetActive(false);
             closeButton.gameObject.SetActive(false);
             manualActionButtons.Add(previousButton);
             manualActionButtons.Add(nextButton);
             manualActionButtons.Add(validateButton);
-            manualActionButtons.Add(resetButton);
             manualActionButtons.Add(clearButton);
-            manualActionButtons.Add(saveButton);
-            manualActionButtons.Add(loadButton);
             manualActionButtons.Add(solveButton);
             manualActionButtons.Add(play3DButton);
-            manualActionButtons.Add(debugButton);
+            manualActionButtons.Add(solverBackButton);
+            solveButton.interactable = false;
+            play3DButton.interactable = false;
 
-            statusText = RuntimeUiFactory.CreateText(panel, "Status", string.Empty, 22, TextAnchor.UpperCenter);
-            statusText.rectTransform.anchorMin = new Vector2(0f, 0f);
-            statusText.rectTransform.anchorMax = new Vector2(1f, 0f);
-            statusText.rectTransform.pivot = new Vector2(0.5f, 0f);
-            statusText.rectTransform.anchoredPosition = new Vector2(0f, 206f);
-            statusText.rectTransform.sizeDelta = new Vector2(-70f, 34f);
+            statusText = RuntimeUiFactory.CreateText(manualInputRoot, "Status", string.Empty, 18, TextAnchor.MiddleCenter);
+            statusText.gameObject.SetActive(false);
 
-            resultText = RuntimeUiFactory.CreateText(panel, "SolverResult", "Result: Not solved yet.", 15, TextAnchor.UpperLeft);
-            resultText.rectTransform.anchorMin = new Vector2(0f, 0f);
-            resultText.rectTransform.anchorMax = new Vector2(1f, 0f);
-            resultText.rectTransform.pivot = new Vector2(0.5f, 0f);
-            resultText.rectTransform.anchoredPosition = new Vector2(0f, 242f);
-            resultText.rectTransform.sizeDelta = new Vector2(-80f, 102f);
-            resultText.horizontalOverflow = HorizontalWrapMode.Wrap;
-            resultText.verticalOverflow = VerticalWrapMode.Truncate;
-
-            debugText = RuntimeUiFactory.CreateText(panel, "DebugText", string.Empty, 13, TextAnchor.UpperLeft);
-            debugText.rectTransform.anchorMin = new Vector2(0f, 0f);
-            debugText.rectTransform.anchorMax = new Vector2(1f, 0f);
-            debugText.rectTransform.pivot = new Vector2(0.5f, 0f);
-            debugText.rectTransform.anchoredPosition = new Vector2(0f, 352f);
-            debugText.rectTransform.sizeDelta = new Vector2(-80f, 28f);
+            debugText = RuntimeUiFactory.CreateText(manualInputRoot, "DebugText", string.Empty, 13, TextAnchor.UpperLeft);
             debugText.gameObject.SetActive(ShowDebugPanel);
 
-            playbackPanel = new SolverPlaybackPanelUI(root.transform);
+            ApplyManualSolverLayout();
+            playbackPanel = new SolverPlaybackPanelUI(contentPanelRect, ExitPlaybackMode);
             Hide();
         }
 
         public void Show()
         {
+            AudioFeedbackManager.SetBgmSuppressed(AudioFeedbackManager.SolverDetailBgmReason, true);
             root.SetActive(true);
             solverCanvas.enabled = true;
             if (solverRaycaster != null)
@@ -262,11 +407,19 @@ namespace CubeChallenge3D.UI.Solver
             }
 
             ResetFaceNavigator();
+            ExitPlaybackMode();
+            inventoryStore.Reload();
             SetLearnMode(false);
         }
 
         public void Hide()
         {
+            playbackPanel?.Hide();
+            if (manualInputRoot != null)
+            {
+                manualInputRoot.gameObject.SetActive(true);
+            }
+
             if (solverRaycaster != null)
             {
                 solverRaycaster.enabled = false;
@@ -274,6 +427,7 @@ namespace CubeChallenge3D.UI.Solver
 
             solverCanvas.enabled = false;
             root.SetActive(false);
+            AudioFeedbackManager.SetBgmSuppressed(AudioFeedbackManager.SolverDetailBgmReason, false);
             Closed?.Invoke();
         }
 
@@ -308,7 +462,7 @@ namespace CubeChallenge3D.UI.Solver
             paletteRoot.gameObject.SetActive(active);
             currentFaceText.gameObject.SetActive(active);
             instructionText.gameObject.SetActive(active);
-            validationText.gameObject.SetActive(active);
+            validationText.gameObject.SetActive(false);
             resultText.gameObject.SetActive(active);
             foreach (Button button in faceButtons)
             {
@@ -324,6 +478,195 @@ namespace CubeChallenge3D.UI.Solver
             {
                 faceGuideView.gameObject.SetActive(active && ShowDebugPanel);
             }
+        }
+
+        private void ApplyManualSolverLayout()
+        {
+            float bodyOffsetY = CalculateManualSolverBodyOffsetY();
+            float headerOffsetY = CalculateManualSolverHeaderOffsetY(bodyOffsetY);
+            SetTopAnchored(titleRect, ApplyHeaderOffset(layout.TitlePosition, bodyOffsetY, headerOffsetY), layout.TitleSize);
+            SetTopAnchored(subtitleRect, ApplyHeaderOffset(layout.SubtitlePosition, bodyOffsetY, headerOffsetY), layout.SubtitleSize);
+            SetTopAnchored(backButtonRect, ApplyHeaderOffset(layout.BackButtonPosition, bodyOffsetY, headerOffsetY), layout.BackButtonSize);
+            SetTopAnchored(contentPanelRect, ApplyBodyOffset(layout.ContentPosition, bodyOffsetY), layout.ContentSize);
+            StretchToParent(manualInputRoot, Vector2.zero, Vector2.zero);
+            SetTopAnchored(faceLabelRect, layout.FaceLabelPosition, layout.FaceLabelSize);
+            SetTopAnchored(cubeBoardRect, layout.CubeBoardPosition, layout.CubeBoardSize);
+            SetCenterTopAnchored(previousButtonRect, layout.PreviousButtonPosition, layout.FaceButtonSize);
+            SetCenterTopAnchored(nextButtonRect, layout.NextButtonPosition, layout.FaceButtonSize);
+            SetCenterTopAnchored(resultBarRect, layout.ResultBarPosition, layout.ResultBarSize);
+            SetTopAnchored(paletteRoot, layout.PalettePosition, new Vector2(
+                (layout.PaletteButtonSize.x * 3f) + (layout.PaletteGapX * 2f),
+                (layout.PaletteButtonSize.y * 2f) + layout.PaletteGapY));
+            SetTopAnchored(helperTextRect, layout.HelperTextPosition, layout.HelperTextSize);
+            SetCenterTopAnchored(validateButtonRect, layout.ValidateButtonPosition, layout.ActionButtonSize);
+            SetCenterTopAnchored(clearButtonRect, layout.ClearButtonPosition, layout.ActionButtonSize);
+            SetCenterTopAnchored(solveButtonRect, layout.SolveButtonPosition, layout.ActionButtonSize);
+            SetCenterTopAnchored(play3DButtonRect, layout.Play3DButtonPosition, layout.ActionButtonSize);
+            SetCenterTopAnchored(solverBackButtonRect, layout.SolverBackButtonPosition, layout.ActionButtonSize);
+
+            for (int i = 0; i < paletteButtons.Count; i++)
+            {
+                int row = i / 3;
+                int col = i % 3;
+                RectTransform rect = paletteButtons[i].GetComponent<RectTransform>();
+                Vector2 position = new Vector2(
+                    (col - 1) * (layout.PaletteButtonSize.x + layout.PaletteGapX),
+                    -row * (layout.PaletteButtonSize.y + layout.PaletteGapY));
+                SetTopAnchored(rect, position, layout.PaletteButtonSize);
+            }
+
+            StretchToParent(resultText.rectTransform, new Vector2(18f, 0f), new Vector2(-18f, 0f));
+            StylePrimaryActionButton(validateButtonRect.GetComponent<Button>());
+            StylePrimaryActionButton(clearButtonRect.GetComponent<Button>());
+            StylePrimaryActionButton(solveButtonRect.GetComponent<Button>());
+            StylePrimaryActionButton(play3DButtonRect.GetComponent<Button>());
+            StylePrimaryActionButton(solverBackButtonRect.GetComponent<Button>());
+            StylePrimaryActionButton(previousButtonRect.GetComponent<Button>());
+            StylePrimaryActionButton(nextButtonRect.GetComponent<Button>());
+        }
+
+        private float CalculateManualSolverBodyOffsetY()
+        {
+            const float referenceHeight = 1920f;
+            RectTransform canvasRect = root != null ? root.GetComponent<RectTransform>() : null;
+            float canvasHeight = canvasRect != null ? canvasRect.rect.height : referenceHeight;
+            float extraHeight = Mathf.Max(0f, canvasHeight - referenceHeight);
+            return Mathf.Clamp(extraHeight * 0.5f, 0f, 220f);
+        }
+
+        private float CalculateManualSolverHeaderOffsetY(float bodyOffsetY)
+        {
+            if (bodyOffsetY <= 0f)
+            {
+                return 0f;
+            }
+
+            RectTransform canvasRect = root != null ? root.GetComponent<RectTransform>() : null;
+            TopCurrencyBar topCurrencyBar = root != null ? root.GetComponentInChildren<TopCurrencyBar>(true) : null;
+            RectTransform topHudRect = topCurrencyBar != null ? topCurrencyBar.GetComponent<RectTransform>() : null;
+            if (canvasRect == null || topHudRect == null)
+            {
+                return 0f;
+            }
+
+            Vector3[] corners = new Vector3[4];
+            topHudRect.GetWorldCorners(corners);
+            float topHudBottomY = float.MaxValue;
+            for (int i = 0; i < corners.Length; i++)
+            {
+                Vector3 local = canvasRect.InverseTransformPoint(corners[i]);
+                topHudBottomY = Mathf.Min(topHudBottomY, local.y);
+            }
+
+            float topHudBottomDistanceFromTop = canvasRect.rect.yMax - topHudBottomY;
+            float contentTopDistanceFromTop = -(layout.ContentPosition.y - bodyOffsetY);
+            float topGap = Mathf.Max(0f, contentTopDistanceFromTop - topHudBottomDistanceFromTop);
+            return Mathf.Clamp(topGap * 0.5f, 0f, 80f);
+        }
+
+        private static Vector2 ApplyBodyOffset(Vector2 basePosition, float bodyOffsetY)
+        {
+            return new Vector2(basePosition.x, basePosition.y - bodyOffsetY);
+        }
+
+        private static Vector2 ApplyHeaderOffset(Vector2 basePosition, float bodyOffsetY, float headerOffsetY)
+        {
+            return new Vector2(basePosition.x, basePosition.y - bodyOffsetY + headerOffsetY);
+        }
+
+        private static void SetTopAnchored(RectTransform rect, Vector2 position, Vector2 size)
+        {
+            if (rect == null)
+            {
+                return;
+            }
+
+            rect.anchorMin = new Vector2(0.5f, 1f);
+            rect.anchorMax = new Vector2(0.5f, 1f);
+            rect.pivot = new Vector2(0.5f, 1f);
+            rect.anchoredPosition = position;
+            rect.sizeDelta = size;
+        }
+
+        private static void SetCenterTopAnchored(RectTransform rect, Vector2 position, Vector2 size)
+        {
+            if (rect == null)
+            {
+                return;
+            }
+
+            rect.anchorMin = new Vector2(0.5f, 1f);
+            rect.anchorMax = new Vector2(0.5f, 1f);
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.anchoredPosition = position;
+            rect.sizeDelta = size;
+        }
+
+        private static void StretchToParent(RectTransform rect, Vector2 offsetMin, Vector2 offsetMax)
+        {
+            if (rect == null)
+            {
+                return;
+            }
+
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.offsetMin = offsetMin;
+            rect.offsetMax = offsetMax;
+        }
+
+        private static void StylePrimaryActionButton(Button button)
+        {
+            if (button == null)
+            {
+                return;
+            }
+
+            Image image = button.GetComponent<Image>();
+            if (image != null)
+            {
+                image.color = new Color(0.12f, 0.35f, 0.96f, 1f);
+            }
+
+            Text label = button.GetComponentInChildren<Text>();
+            if (label != null)
+            {
+                label.fontStyle = FontStyle.Bold;
+                label.color = Color.white;
+                ApplyTextDepth(label, new Color(0f, 0f, 0f, 0.56f), new Vector2(1.5f, -1.5f));
+            }
+
+            AddOutline(button.gameObject, GoldLine, new Vector2(2.5f, -2.5f));
+        }
+
+        private static void AddOutline(GameObject target, Color color, Vector2 distance)
+        {
+            if (target == null)
+            {
+                return;
+            }
+
+            Outline outline = target.GetComponent<Outline>();
+            if (outline == null)
+            {
+                outline = target.AddComponent<Outline>();
+            }
+
+            outline.effectColor = color;
+            outline.effectDistance = distance;
+        }
+
+        private static void ApplyTextDepth(Text text, Color color, Vector2 distance)
+        {
+            if (text == null || text.GetComponent<Shadow>() != null)
+            {
+                return;
+            }
+
+            Shadow shadow = text.gameObject.AddComponent<Shadow>();
+            shadow.effectColor = color;
+            shadow.effectDistance = distance;
         }
 
         private void CreateFaceButtons(RectTransform parent)
@@ -372,6 +715,7 @@ namespace CubeChallenge3D.UI.Solver
                 {
                     int index = (currentFrontFaceIndex * SolverInputState.FaceletPerFace) + cellIndex;
                     state.faceletColorIndexes[index] = state.selectedColorIndex;
+                    InvalidateSolverProgress();
                     Refresh();
                 });
                 cellButtons.Add(button);
@@ -389,6 +733,45 @@ namespace CubeChallenge3D.UI.Solver
             rect.anchoredPosition = new Vector2(0f, -650f);
             rect.sizeDelta = new Vector2(640f, 112f);
             return rect;
+        }
+
+        private void CreateSolverTicketCountContent(RectTransform parent)
+        {
+            if (parent == null)
+            {
+                return;
+            }
+
+            Text label = parent.GetComponentInChildren<Text>();
+            if (label != null)
+            {
+                label.gameObject.SetActive(false);
+            }
+
+            GameObject iconObject = new GameObject("SolverTicketIcon", typeof(RectTransform), typeof(Image));
+            iconObject.transform.SetParent(parent, false);
+            RectTransform iconRect = iconObject.GetComponent<RectTransform>();
+            iconRect.anchorMin = new Vector2(0.5f, 0.5f);
+            iconRect.anchorMax = new Vector2(0.5f, 0.5f);
+            iconRect.pivot = new Vector2(0.5f, 0.5f);
+            iconRect.anchoredPosition = new Vector2(-112f, 0f);
+            iconRect.sizeDelta = new Vector2(68f, 68f);
+            solverTicketIconImage = iconObject.GetComponent<Image>();
+            solverTicketIconImage.sprite = Resources.Load<Sprite>("UI/Shop/Icons/solver_ticket");
+            solverTicketIconImage.preserveAspect = true;
+            solverTicketIconImage.color = Color.white;
+            solverTicketIconImage.raycastTarget = false;
+
+            solverTicketCountText = RuntimeUiFactory.CreateText(parent, "SolverTicketCount", "Solve x 0", 34, TextAnchor.MiddleLeft);
+            solverTicketCountText.fontStyle = FontStyle.Bold;
+            solverTicketCountText.color = Color.white;
+            RectTransform textRect = solverTicketCountText.rectTransform;
+            textRect.anchorMin = new Vector2(0.5f, 0.5f);
+            textRect.anchorMax = new Vector2(0.5f, 0.5f);
+            textRect.pivot = new Vector2(0f, 0.5f);
+            textRect.anchoredPosition = new Vector2(-66f, 0f);
+            textRect.sizeDelta = new Vector2(260f, 70f);
+            ApplyTextDepth(solverTicketCountText, new Color(0f, 0f, 0f, 0.58f), new Vector2(1.5f, -1.5f));
         }
 
         private void CreatePaletteButtons()
@@ -424,12 +807,17 @@ namespace CubeChallenge3D.UI.Solver
             int internalFaceIndex = currentFrontFaceIndex;
             if (currentFaceText != null)
             {
-                currentFaceText.text = $"Enter {InternalFaceDisplayNames[currentFrontFaceIndex]} Face";
+                currentFaceText.text = $"FACE: {InternalFaceLabels[currentFrontFaceIndex]}";
             }
 
             if (instructionText != null)
             {
-                instructionText.text = "Select a color, then tap the 9 stickers.";
+                instructionText.text = "Select a color, then enter the stickers.";
+            }
+
+            if (solverTicketCountText != null)
+            {
+                solverTicketCountText.text = $"Solve x {inventoryStore.SolverTickets}";
             }
 
             for (int i = 0; i < cellButtons.Count; i++)
@@ -474,6 +862,7 @@ namespace CubeChallenge3D.UI.Solver
             }
 
             inputCube3DView?.RefreshColors();
+            UpdateGuidanceButtons();
         }
 
         private void OnInputCubeFaceChanged(int internalFaceIndex)
@@ -489,7 +878,163 @@ namespace CubeChallenge3D.UI.Solver
 
         private void OnInputCubeChanged()
         {
+            InvalidateSolverProgress();
             Refresh();
+        }
+
+        private void InvalidateSolverProgress()
+        {
+            validationAttemptedForCurrentInput = false;
+            validationPassedForCurrentInput = false;
+            solveAttemptedForCurrentInput = false;
+            solutionReadyForCurrentInput = false;
+            lastSolution = null;
+            if (solveButton != null)
+            {
+                solveButton.interactable = false;
+            }
+
+            if (play3DButton != null)
+            {
+                play3DButton.interactable = false;
+            }
+
+            StopPulse(solveButton);
+            StopPulse(play3DButton);
+        }
+
+        private void UpdateGuidanceButtons()
+        {
+            if (validateButton != null)
+            {
+                validateButton.interactable = true;
+            }
+
+            bool complete = IsFullColorInputComplete();
+            if (!complete)
+            {
+                validationPassedForCurrentInput = false;
+                solutionReadyForCurrentInput = false;
+                if (solveButton != null)
+                {
+                    solveButton.interactable = false;
+                }
+
+                if (play3DButton != null)
+                {
+                    play3DButton.interactable = false;
+                }
+
+                StopPulse(validateButton);
+                StopPulse(solveButton);
+                StopPulse(play3DButton);
+                return;
+            }
+
+            if (!validationPassedForCurrentInput)
+            {
+                if (!validationAttemptedForCurrentInput)
+                {
+                    StartPulse(validateButton);
+                }
+                else
+                {
+                    StopPulse(validateButton);
+                }
+
+                if (solveButton != null)
+                {
+                    solveButton.interactable = false;
+                }
+
+                if (play3DButton != null)
+                {
+                    play3DButton.interactable = false;
+                }
+
+                StopPulse(solveButton);
+                StopPulse(play3DButton);
+                return;
+            }
+
+            StopPulse(validateButton);
+            if (!solutionReadyForCurrentInput)
+            {
+                if (solveButton != null)
+                {
+                    solveButton.interactable = true;
+                }
+
+                if (!solveAttemptedForCurrentInput)
+                {
+                    StartPulse(solveButton);
+                }
+                else
+                {
+                    StopPulse(solveButton);
+                }
+
+                if (play3DButton != null)
+                {
+                    play3DButton.interactable = false;
+                }
+
+                StopPulse(play3DButton);
+                return;
+            }
+
+            StopPulse(solveButton);
+            if (play3DButton != null && play3DButton.interactable)
+            {
+                StartPulse(play3DButton);
+            }
+        }
+
+        private bool IsFullColorInputComplete()
+        {
+            state.EnsureShape();
+            for (int i = 0; i < PaletteColors.Length; i++)
+            {
+                if (CountColor(PaletteColors[i]) != SolverInputState.FaceletPerFace)
+                {
+                    return false;
+                }
+            }
+
+            for (int i = 0; i < SolverInputState.FaceletCount; i++)
+            {
+                if ((CubeColor)state.faceletColorIndexes[i] == CubeColor.None)
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private static void StartPulse(Button button)
+        {
+            if (button == null || !button.interactable)
+            {
+                return;
+            }
+
+            ButtonPulseHint hint = button.GetComponent<ButtonPulseHint>();
+            if (hint == null)
+            {
+                hint = button.gameObject.AddComponent<ButtonPulseHint>();
+            }
+
+            hint.Play();
+        }
+
+        private static void StopPulse(Button button)
+        {
+            ButtonPulseHint hint = button != null ? button.GetComponent<ButtonPulseHint>() : null;
+            if (hint != null)
+            {
+                hint.Stop();
+            }
         }
 
         private void SelectInternalFace(int internalFaceIndex)
@@ -545,16 +1090,33 @@ namespace CubeChallenge3D.UI.Solver
 
         private void Validate()
         {
+            StopPulse(validateButton);
+            validationAttemptedForCurrentInput = true;
+            validationPassedForCurrentInput = false;
+            solveAttemptedForCurrentInput = false;
+            solutionReadyForCurrentInput = false;
+            if (solveButton != null)
+            {
+                solveButton.interactable = false;
+            }
+
+            if (play3DButton != null)
+            {
+                play3DButton.interactable = false;
+            }
+
             if (!TryCreateRequest(out SolverRequest request, out string error))
             {
                 statusText.text = $"Invalid cube input.\n{error}";
                 resultText.text = BuildFailureResultText("Invalid cube input", error, null);
                 validationText.text = BuildValidationSummary();
                 debugText.text = BuildDebugText();
+                UpdateGuidanceButtons();
                 return;
             }
 
             SolverValidationResult result = solverEngine.Validate(request);
+            validationPassedForCurrentInput = result.isValid;
             statusText.text = result.isValid
                 ? "Cube input is valid."
                 : result.userMessage;
@@ -563,6 +1125,7 @@ namespace CubeChallenge3D.UI.Solver
                 : BuildFailureResultText("Invalid cube", result.userMessage, result.errorCode);
             validationText.text = BuildValidationSummary();
             debugText.text = BuildDebugText();
+            UpdateGuidanceButtons();
         }
 
         private void ResetSolved()
@@ -572,8 +1135,7 @@ namespace CubeChallenge3D.UI.Solver
             store.Save(state);
             inputCube3DView?.SetState(state);
             inputCube3DView?.ResetToFront();
-            lastSolution = null;
-            play3DButton.interactable = false;
+            InvalidateSolverProgress();
             statusText.text = "Reset to solved cube.";
             resultText.text = "Status: Cube is already solved\nMoves: 0\nSolution: No moves needed";
             Refresh();
@@ -587,8 +1149,7 @@ namespace CubeChallenge3D.UI.Solver
                 state.faceletColorIndexes[i] = (int)CubeColor.None;
             }
 
-            lastSolution = null;
-            play3DButton.interactable = false;
+            InvalidateSolverProgress();
             statusText.text = "Input cleared.";
             resultText.text = "Result: Not solved yet.";
             inputCube3DView?.RefreshColors();
@@ -606,8 +1167,7 @@ namespace CubeChallenge3D.UI.Solver
         {
             state = store.Load();
             inputCube3DView?.SetState(state);
-            lastSolution = null;
-            play3DButton.interactable = false;
+            InvalidateSolverProgress();
             statusText.text = "Solver input loaded.";
             resultText.text = "Result: Loaded input. Press Solve to calculate a solution.";
             Refresh();
@@ -615,6 +1175,9 @@ namespace CubeChallenge3D.UI.Solver
 
         private void Solve()
         {
+            StopPulse(solveButton);
+            solveAttemptedForCurrentInput = true;
+            solutionReadyForCurrentInput = false;
             if (isSolving)
             {
                 return;
@@ -622,7 +1185,14 @@ namespace CubeChallenge3D.UI.Solver
 
             if (!TryCreateRequest(out SolverRequest request, out string error))
             {
+                validationPassedForCurrentInput = false;
+                solutionReadyForCurrentInput = false;
                 lastSolution = null;
+                if (solveButton != null)
+                {
+                    solveButton.interactable = false;
+                }
+
                 play3DButton.interactable = false;
                 statusText.text = $"Invalid cube input.\n{error}";
                 resultText.text = BuildFailureResultText("Invalid cube input", error, null);
@@ -647,6 +1217,18 @@ namespace CubeChallenge3D.UI.Solver
             SolverValidationResult validation = solverEngine.Validate(request);
             if (!validation.isValid)
             {
+                validationPassedForCurrentInput = false;
+                solutionReadyForCurrentInput = false;
+                if (solveButton != null)
+                {
+                    solveButton.interactable = false;
+                }
+
+                if (play3DButton != null)
+                {
+                    play3DButton.interactable = false;
+                }
+
                 statusText.text = validation.userMessage;
                 resultText.text = BuildFailureResultText("Invalid cube", validation.userMessage, validation.errorCode);
                 validationText.text = BuildValidationSummary();
@@ -656,6 +1238,7 @@ namespace CubeChallenge3D.UI.Solver
                 }
 
                 isSolving = false;
+                UpdateGuidanceButtons();
                 return;
             }
 
@@ -672,6 +1255,7 @@ namespace CubeChallenge3D.UI.Solver
 
                 solutionStore.Save(lastSolution);
                 play3DButton.interactable = result.moveCount > 0;
+                solutionReadyForCurrentInput = true;
                 string usageMessage = ConsumeSolverUseIfNeeded(result.moveCount);
                 statusText.text = $"Solver status: {result.message}";
                 resultText.text = BuildSuccessResultText(result, usageMessage);
@@ -686,6 +1270,7 @@ namespace CubeChallenge3D.UI.Solver
             else if (result.isValidCube)
             {
                 lastSolution = null;
+                solutionReadyForCurrentInput = false;
                 play3DButton.interactable = false;
                 statusText.text = result.errorCode == SolverErrorCode.Timeout
                     ? "The current solver timed out."
@@ -695,6 +1280,13 @@ namespace CubeChallenge3D.UI.Solver
             else
             {
                 lastSolution = null;
+                validationPassedForCurrentInput = false;
+                solutionReadyForCurrentInput = false;
+                if (solveButton != null)
+                {
+                    solveButton.interactable = false;
+                }
+
                 play3DButton.interactable = false;
                 statusText.text = $"Invalid cube state.\n{result.message}\nPlease check corner and edge colors.";
                 resultText.text = BuildFailureResultText("Invalid cube state", FriendlySolverMessage(result), result.errorCode);
@@ -714,10 +1306,12 @@ namespace CubeChallenge3D.UI.Solver
             }
 
             isSolving = false;
+            UpdateGuidanceButtons();
         }
 
         private void ShowPlayback()
         {
+            StopPulse(play3DButton);
             if (lastSolution == null)
             {
                 statusText.text = "No solver solution available.";
@@ -730,7 +1324,17 @@ namespace CubeChallenge3D.UI.Solver
                 return;
             }
 
+            manualInputRoot.gameObject.SetActive(false);
             playbackPanel?.Show(lastSolution);
+        }
+
+        private void ExitPlaybackMode()
+        {
+            playbackPanel?.Hide();
+            if (manualInputRoot != null)
+            {
+                manualInputRoot.gameObject.SetActive(true);
+            }
         }
 
         private string ConsumeSolverUseIfNeeded(int moveCount)
@@ -761,7 +1365,7 @@ namespace CubeChallenge3D.UI.Solver
 
         private static bool IsSolverUsageBypassed()
         {
-            return Application.isEditor || Debug.isDebugBuild;
+            return false;
         }
 
         private static string BuildSuccessResultText(SolverResult result, string usageMessage)
@@ -1552,6 +2156,52 @@ namespace CubeChallenge3D.UI.Solver
 
                     cell.anchoredPosition = cellBasePositions[i];
                     cell.localScale = Vector3.one;
+                }
+            }
+        }
+
+        private sealed class ButtonPulseHint : MonoBehaviour
+        {
+            private Coroutine pulseRoutine;
+            private Vector3 baseScale = Vector3.one;
+
+            public void Play()
+            {
+                if (pulseRoutine != null)
+                {
+                    return;
+                }
+
+                baseScale = transform.localScale;
+                pulseRoutine = StartCoroutine(Pulse());
+            }
+
+            public void Stop()
+            {
+                if (pulseRoutine != null)
+                {
+                    StopCoroutine(pulseRoutine);
+                    pulseRoutine = null;
+                }
+
+                transform.localScale = baseScale;
+            }
+
+            private void OnDisable()
+            {
+                Stop();
+            }
+
+            private IEnumerator Pulse()
+            {
+                const float speed = 3.8f;
+                const float amount = 0.08f;
+                while (true)
+                {
+                    float wave = (Mathf.Sin(Time.unscaledTime * speed) + 1f) * 0.5f;
+                    float scale = 1f + (wave * amount);
+                    transform.localScale = baseScale * scale;
+                    yield return null;
                 }
             }
         }

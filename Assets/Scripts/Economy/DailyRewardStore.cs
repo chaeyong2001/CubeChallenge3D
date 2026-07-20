@@ -2,6 +2,7 @@ using System;
 using CubeChallenge3D.Save;
 using CubeChallenge3D.Inventory;
 using CubeChallenge3D.Stages.Assist;
+using UnityEngine;
 
 namespace CubeChallenge3D.Economy
 {
@@ -74,16 +75,22 @@ namespace CubeChallenge3D.Economy
             switch (reward.type)
             {
                 case DailyRewardType.Coins:
-                    return $"Day {CurrentDayNumber}: {reward.amount} coins";
+                    return $"Day {CurrentDayNumber}: {reward.amount} coins + {EconomyBalanceConfig.DailySolverTicketBonus} Solver Tickets";
                 case DailyRewardType.Gems:
-                    return $"Day {CurrentDayNumber}: {reward.amount} gems";
+                    return $"Day {CurrentDayNumber}: {reward.amount} gems + {EconomyBalanceConfig.DailySolverTicketBonus} Solver Tickets";
                 case DailyRewardType.Hearts:
-                    return $"Day {CurrentDayNumber}: \u2665 +{reward.amount} Hearts";
+                    return $"Day {CurrentDayNumber}: \u2665 +{reward.amount} Hearts + {EconomyBalanceConfig.DailySolverTicketBonus} Solver Tickets";
                 case DailyRewardType.Item:
-                    return $"Day {CurrentDayNumber}: {reward.itemType} x{reward.amount}";
+                    return $"Day {CurrentDayNumber}: {reward.itemType} x{reward.amount} + {EconomyBalanceConfig.DailySolverTicketBonus} Solver Tickets";
                 default:
                     return "Daily Reward";
             }
+        }
+
+        public DailyRewardDefinition GetRewardForDay(int dayNumber)
+        {
+            int normalized = Mathf.Clamp(dayNumber, 1, Rewards.Length) - 1;
+            return Rewards[normalized];
         }
 
         public bool TryClaim(DateTime utcNow, WalletStore walletStore, InventoryStore inventoryStore)
@@ -109,6 +116,7 @@ namespace CubeChallenge3D.Economy
                     inventoryStore.Add(reward.itemType, reward.amount);
                     break;
             }
+            inventoryStore.Add(StageAssistItemType.SolverTicket, EconomyBalanceConfig.DailySolverTicketBonus);
 
             MarkClaimed(utcNow);
             return true;
@@ -131,6 +139,12 @@ namespace CubeChallenge3D.Economy
         {
             data = new DailyRewardData();
             SaveService.SaveJson(FileName, data);
+        }
+
+        public void DebugMakeCurrentRewardClaimable(DateTime utcNow)
+        {
+            Data.lastClaimDateUtc = utcNow.AddDays(-1).ToString("o");
+            SaveService.SaveJson(FileName, Data);
         }
 
         private static DailyRewardData Load()

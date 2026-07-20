@@ -8,7 +8,7 @@ namespace CubeChallenge3D.Cube.Model
     {
         public static CubeMove Inverse(CubeMove move)
         {
-            return new CubeMove(move.Face, -move.QuarterTurns);
+            return CubeMove.CreateLayer(move.Axis, move.LayerIndex, -move.AxisQuarterTurns);
         }
 
         public static IReadOnlyList<CubeMove> InverseSequence(IEnumerable<CubeMove> moves)
@@ -67,6 +67,34 @@ namespace CubeChallenge3D.Cube.Model
             }
 
             return string.Join(" ", moves.Select(move => move.ToString()));
+        }
+
+        public static int CountPlayerTurns(IEnumerable<CubeMove> moves)
+        {
+            if (moves == null)
+            {
+                throw new ArgumentNullException(nameof(moves));
+            }
+
+            return moves.Sum(move => move.QuarterTurns == 2 ? 2 : 1);
+        }
+
+        public static int CountPlayerTurns(IEnumerable<string> moveNotations)
+        {
+            if (moveNotations == null)
+            {
+                throw new ArgumentNullException(nameof(moveNotations));
+            }
+
+            return CountPlayerTurns(moveNotations.Select(notation =>
+            {
+                if (!CubeMove.TryParse(notation, out CubeMove move))
+                {
+                    throw new FormatException($"Invalid cube move notation: {notation}");
+                }
+
+                return move;
+            }));
         }
     }
 }

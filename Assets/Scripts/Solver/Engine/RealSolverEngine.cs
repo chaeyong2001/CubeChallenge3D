@@ -184,7 +184,7 @@ namespace CubeChallenge3D.Solver.Engine
                         message = "Solution found.",
                         moveNotations = moveNotations,
                         solutionNotation = MoveUtility.ToNotationSequence(path),
-                        moveCount = path.Count,
+                        moveCount = MoveUtility.CountPlayerTurns(path),
                         elapsedMs = (int)stopwatch.ElapsedMilliseconds,
                         engineName = EngineName,
                         maxDepth = maxDepth,

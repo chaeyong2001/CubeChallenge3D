@@ -6,6 +6,7 @@ namespace CubeChallenge3D.Stages.Assist
         MovePlus1,
         MovePlus2,
         MovePlus3,
-        SolverTicket
+        SolverTicket,
+        NicknameTicket
     }
 }

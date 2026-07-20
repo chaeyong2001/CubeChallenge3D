@@ -60,12 +60,20 @@ namespace CubeChallenge3D.Stages.Generation
 
             int solveCount = collection.stages.Count(stage => stage != null && stage.stageType == StageType.SolveStage);
             int targetCount = collection.stages.Count(stage => stage != null && stage.stageType == StageType.ReverseTargetStage);
-            if (solveCount != 100 || targetCount != 100)
+            int infinityCount = collection.stages.Count(stage => stage != null && stage.stageType == StageType.InfinityStage);
+            int tutorialCount = collection.stages.Count(stage => stage != null && stage.stageType == StageType.TutorialStage);
+            if (solveCount != StagePackGenerator.NormalStageCount
+                || targetCount != StagePackGenerator.HardStageCount
+                || infinityCount != StagePackGenerator.InfinityStageCount
+                || tutorialCount != StagePackGenerator.TutorialStageCount)
             {
-                result.AddError($"Expected 100 Solve and 100 Reverse Target stages, found {solveCount} and {targetCount}.");
+                result.AddError(
+                    $"Expected {StagePackGenerator.TutorialStageCount} Tutorial, {StagePackGenerator.NormalStageCount} Solve, "
+                    + $"{StagePackGenerator.HardStageCount} Reverse Target, {StagePackGenerator.InfinityStageCount} Infinity stages, "
+                    + $"found {tutorialCount}, {solveCount}, {targetCount}, {infinityCount}.");
             }
 
-            for (int start = 1; start <= 200; start += 10)
+            for (int start = 1; start <= StagePackGenerator.NormalStageCount + StagePackGenerator.HardStageCount + StagePackGenerator.InfinityStageCount; start += 10)
             {
                 int blockCount = collection.stages.Count(
                     stage => stage != null && stage.stageNumber >= start && stage.stageNumber < start + 10);
@@ -93,7 +101,7 @@ namespace CubeChallenge3D.Stages.Generation
                 result.AddError($"{stage.stageId}: solution contains fewer than 5 moves.");
             }
 
-            if (stage.stageType == StageType.SolveStage)
+            if (IsSolvePatternStage(stage))
             {
                 CubeState start = CubeStateSerializer.FromFaceletString(stage.startStateFacelets);
                 CubeState check = start.Clone();
@@ -105,12 +113,12 @@ namespace CubeChallenge3D.Stages.Generation
 
                 if (!solveStates.Add(stage.startStateFacelets))
                 {
-                    result.AddError($"{stage.stageId}: duplicate Solve stage state.");
+                    result.AddError($"{stage.stageId}: duplicate solve-pattern stage state.");
                 }
 
                 if (!solveNotations.Add(normalizedNotation))
                 {
-                    result.AddError($"{stage.stageId}: duplicate normalized Solve notation.");
+                    result.AddError($"{stage.stageId}: duplicate normalized solve-pattern notation.");
                 }
             }
             else
@@ -125,14 +133,21 @@ namespace CubeChallenge3D.Stages.Generation
 
                 if (!targetStates.Add(stage.targetStateFacelets))
                 {
-                    result.AddError($"{stage.stageId}: duplicate Reverse Target state.");
+                    result.AddError($"{stage.stageId}: duplicate target-pattern stage state.");
                 }
 
                 if (!targetNotations.Add(normalizedNotation))
                 {
-                    result.AddError($"{stage.stageId}: duplicate normalized Reverse Target notation.");
+                    result.AddError($"{stage.stageId}: duplicate normalized target-pattern notation.");
                 }
             }
+        }
+
+        private static bool IsSolvePatternStage(StageData stage)
+        {
+            return stage.stageType == StageType.SolveStage
+                || stage.stageType == StageType.TutorialStage
+                || stage.stageType == StageType.InfinityStage && !string.IsNullOrWhiteSpace(stage.scrambleNotation);
         }
     }
 }

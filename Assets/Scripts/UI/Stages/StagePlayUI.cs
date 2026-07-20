@@ -26,6 +26,9 @@ namespace CubeChallenge3D.UI.Stages
         private Button movePlus2Button;
         private Button movePlus3Button;
         private Button continueButton;
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        private Button forceClearButton;
+#endif
         private GameObject targetPopupRoot;
         private Text popupText;
         private TargetPreviewCubeView previewView;
@@ -91,6 +94,14 @@ namespace CubeChallenge3D.UI.Stages
             movePlus1Button = RuntimeUiFactory.CreateButton(panel, "MovePlus1Button", "+1 Move", new Vector2(-205f, 154f), new Vector2(180f, 54f));
             movePlus2Button = RuntimeUiFactory.CreateButton(panel, "MovePlus2Button", "+2 Move", new Vector2(0f, 154f), new Vector2(180f, 54f));
             movePlus3Button = RuntimeUiFactory.CreateButton(panel, "MovePlus3Button", "+3 Move", new Vector2(215f, 154f), new Vector2(200f, 54f));
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            forceClearButton = RuntimeUiFactory.CreateButton(panel, "ForceClearDebugButton", "Force Clear", new Vector2(205f, -52f), new Vector2(210f, 48f));
+            Image forceClearImage = forceClearButton.GetComponent<Image>();
+            if (forceClearImage != null)
+            {
+                forceClearImage.color = new Color(0.45f, 0.22f, 0.04f, 0.94f);
+            }
+#endif
 
             startButton.onClick.AddListener(() => gameMode?.StartStage());
             viewTargetButton.onClick.AddListener(ShowTargetPopup);
@@ -103,6 +114,9 @@ namespace CubeChallenge3D.UI.Stages
             movePlus1Button.onClick.AddListener(() => gameMode?.UseMoveItem(StageAssistItemType.MovePlus1));
             movePlus2Button.onClick.AddListener(() => gameMode?.UseMoveItem(StageAssistItemType.MovePlus2));
             movePlus3Button.onClick.AddListener(() => gameMode?.UseMoveItem(StageAssistItemType.MovePlus3));
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            forceClearButton.onClick.AddListener(() => gameMode?.ForceClearForDebug());
+#endif
             BuildTargetPopup();
             BuildHeartPopup();
             previewView = new GameObject("TargetPreviewCubeView").AddComponent<TargetPreviewCubeView>();
@@ -216,7 +230,10 @@ namespace CubeChallenge3D.UI.Stages
             movePlus2Button.gameObject.SetActive(isPlaying);
             movePlus3Button.gameObject.SetActive(isPlaying);
             continueButton.gameObject.SetActive(isFailed);
-            continueButton.interactable = gameMode.CanContinueAfterAd() && !gameMode.IsShowingAd;
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            forceClearButton.gameObject.SetActive(gameMode.State != StagePlayState.Cleared);
+#endif
+            continueButton.interactable = gameMode.CanRequestContinueAfterAd() && !gameMode.IsShowingAd;
             UpdateAssistButtonLabels();
             UpdateAssistButtonInteractivity(isPlaying);
             UpdateTargetPreview();
@@ -297,7 +314,7 @@ namespace CubeChallenge3D.UI.Stages
             int continues = gameMode.AssistState != null ? gameMode.AssistState.adContinueCount : 0;
             SetButtonLabel(
                 continueButton,
-                gameMode.CanContinueAfterAd() || gameMode.IsShowingAd
+                gameMode.CanRequestContinueAfterAd() || gameMode.IsShowingAd
                     ? $"Watch Ad for +{gameMode.StageContinueMovesReward} Moves\n{continues}/{gameMode.StageContinueMaxPerRun} used"
                     : gameMode.StageContinueAdStatus);
             Text continueLabel = continueButton.GetComponentInChildren<Text>();

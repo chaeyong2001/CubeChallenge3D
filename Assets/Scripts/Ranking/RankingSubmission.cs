@@ -9,6 +9,7 @@ namespace CubeChallenge3D.Ranking
         public string challengeId;
         public string playerId;
         public string playerName;
+        public int avatarId = -1;
         public float elapsedSeconds;
         public int moveCount;
         public string scrambleNotation;
@@ -28,6 +29,7 @@ namespace CubeChallenge3D.Ranking
             string challengeId,
             string playerId,
             string playerName,
+            int avatarId,
             float elapsedSeconds,
             int moveCount,
             string scrambleNotation,
@@ -40,6 +42,7 @@ namespace CubeChallenge3D.Ranking
                 challengeId = challengeId,
                 playerId = string.IsNullOrWhiteSpace(playerId) ? "local" : playerId,
                 playerName = string.IsNullOrWhiteSpace(playerName) ? "Player" : playerName,
+                avatarId = avatarId,
                 elapsedSeconds = elapsedSeconds,
                 moveCount = moveCount,
                 scrambleNotation = scrambleNotation,

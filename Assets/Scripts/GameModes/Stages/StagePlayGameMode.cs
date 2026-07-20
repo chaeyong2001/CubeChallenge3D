@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using CubeChallenge3D.Ads;
+using CubeChallenge3D.Audio;
 using CubeChallenge3D.Cube.Input;
 using CubeChallenge3D.Cube.Model;
 using CubeChallenge3D.Cube.Runtime;
@@ -47,7 +48,8 @@ namespace CubeChallenge3D.GameModes.Stages
         public int MaxStarsAllowed => maxStarsAllowed;
         public bool BestStarsUpdated => bestStarsUpdated;
         public StageData CurrentStage => runtime.stage;
-        public bool IsReverseTargetStage => runtime.stage != null && runtime.stage.stageType == StageType.ReverseTargetStage;
+        public int CurrentProgressStageNumber => GetCurrentProgressStageNumber();
+        public bool IsReverseTargetStage => IsTargetPatternStage(runtime.stage);
         public CubeState TargetState => targetState?.Clone();
         public StageAssistState AssistState => assistState;
         public StageHintResult LastHint => lastHint;
@@ -59,7 +61,7 @@ namespace CubeChallenge3D.GameModes.Stages
         public string StageContinueAdStatus => assistState != null
             && assistState.adContinueCount >= StageContinueMaxPerRun
                 ? "Stage continue limit reached."
-                : rewardService?.GetUnavailableMessage(RewardedAdPlacement.StageContinue)
+                : rewardService?.GetUnavailableMessage(RewardedAdPlacement.OutOfMovesPlus2)
                     ?? "Ad is not available yet.";
 
         public event Action StateChanged;
@@ -70,6 +72,9 @@ namespace CubeChallenge3D.GameModes.Stages
             StageDataLoader loader,
             StageProgressStore store)
         {
+            AudioFeedbackManager.SetBgmSuppressed(AudioFeedbackManager.StageGameplayBgmReason, true);
+            AudioFeedbackManager.SetBgmSuppressed(AudioFeedbackManager.StageAdvanceBgmReason, false);
+
             if (cubeController != null)
             {
                 cubeController.MoveCommandCompleted -= HandleMoveCompleted;
@@ -121,7 +126,7 @@ namespace CubeChallenge3D.GameModes.Stages
             maxStarsAllowed = 3;
             bestStarsUpdated = false;
 
-            if (stage.stageType == StageType.ReverseTargetStage)
+            if (IsTargetPatternStage(stage))
             {
                 if (!TryBuildTargetState(stage, out targetState))
                 {
@@ -159,7 +164,7 @@ namespace CubeChallenge3D.GameModes.Stages
             {
                 cubeController.SetUserInputEnabled(false);
                 SetState(
-                    runtime.stage.stageType == StageType.ReverseTargetStage
+                    IsTargetPatternStage(runtime.stage)
                         ? StagePlayState.TargetIntro
                         : StagePlayState.Ready,
                     "Not enough hearts. Get more hearts from Shop or Daily Rewards.");
@@ -174,7 +179,7 @@ namespace CubeChallenge3D.GameModes.Stages
             runtime.remainingMoves = runtime.moveLimit;
             runtime.isCompleted = false;
             runtime.isFailed = false;
-            if (runtime.stage.stageType != StageType.ReverseTargetStage)
+            if (!IsTargetPatternStage(runtime.stage))
             {
                 targetState = null;
             }
@@ -188,7 +193,7 @@ namespace CubeChallenge3D.GameModes.Stages
             cubeController.SetViewVisible(true);
             SetState(StagePlayState.Preparing, "Preparing stage...");
 
-            if (runtime.stage.stageType == StageType.ReverseTargetStage)
+            if (IsTargetPatternStage(runtime.stage))
             {
                 StartReverseTargetStage();
                 return;
@@ -261,13 +266,46 @@ namespace CubeChallenge3D.GameModes.Stages
                 return;
             }
 
-            LoadStage(next);
-            StartStage();
+            StageData currentStage = runtime.stage;
+            StageInterstitialPolicy.TryShowBeforeNextStage(currentStage, () =>
+            {
+                LoadStage(next);
+                StartStage();
+            });
         }
 
         public bool HasNextPlayableStage()
         {
             return GetNextPlayableStage() != null;
+        }
+
+        public StageData PeekNextPlayableStage()
+        {
+            return GetNextPlayableStage();
+        }
+
+        private int GetCurrentProgressStageNumber()
+        {
+            if (runtime.stage == null)
+            {
+                return 0;
+            }
+
+            IReadOnlyList<StageData> stages = dataLoader.LoadAllStages()
+                .Where(stage => stage != null && stage.stageType == runtime.stage.stageType)
+                .OrderBy(stage => stage.stageNumber)
+                .ToList();
+            int highestClearedStage = 0;
+            foreach (StageData stage in stages)
+            {
+                if (progressStore.GetProgress(stage.stageId).isCleared)
+                {
+                    highestClearedStage = Mathf.Max(highestClearedStage, stage.stageNumber);
+                }
+            }
+
+            StageData next = stages.FirstOrDefault(stage => stage.stageNumber > highestClearedStage);
+            return next != null ? next.stageNumber : highestClearedStage;
         }
 
         [ContextMenu("DEV Force Clear Stage")]
@@ -283,7 +321,7 @@ namespace CubeChallenge3D.GameModes.Stages
                 return;
             }
 
-            CubeState completedState = runtime.stage.stageType == StageType.ReverseTargetStage
+            CubeState completedState = IsTargetPatternStage(runtime.stage)
                 ? targetState?.Clone()
                 : CubeState.CreateSolved();
             if (completedState == null)
@@ -292,16 +330,14 @@ namespace CubeChallenge3D.GameModes.Stages
                 return;
             }
 
-            // DEV only: use the normal clear pipeline so stars, rewards,
-            // progress, unlocks, and milestones can be verified together.
+            // DEV only: use the normal clear pipeline with the current moves
+            // and assist state so the resulting stars match the real rules.
             cubeController.SetStateInstant(completedState, true);
             cubeController.SetViewVisible(true);
-            runtime.currentMoves = 0;
-            runtime.remainingMoves = runtime.moveLimit;
             runtime.isFailed = false;
             runtime.isPlaying = false;
             CompleteStage();
-            Debug.Log($"DEV force-cleared stage: {runtime.stage.stageId}. Remove this shortcut before release.");
+            Debug.Log($"DEV force-cleared stage: {runtime.stage.stageId} moves={runtime.currentMoves} stars={earnedStars}. Remove this shortcut before release.");
 #endif
         }
 
@@ -333,18 +369,96 @@ namespace CubeChallenge3D.GameModes.Stages
                 && assistState != null
                 && assistState.adContinueCount < StageContinueMaxPerRun
                 && rewardService != null
-                && rewardService.CanShow(RewardedAdPlacement.StageContinue);
+                && rewardService.CanShow(RewardedAdPlacement.OutOfMovesPlus2);
+        }
+
+        public bool CanRequestContinueAfterAd()
+        {
+            return state == StagePlayState.Failed
+                && assistState != null
+                && assistState.adContinueCount < StageContinueMaxPerRun
+                && rewardService != null
+                && !rewardService.IsShowingAd
+                && rewardService.IsPlacementAvailable(RewardedAdPlacement.OutOfMovesPlus2);
+        }
+
+        public int GetCurrentPotentialStars()
+        {
+            if (runtime.stage == null)
+            {
+                return 0;
+            }
+
+            if (state == StagePlayState.Cleared)
+            {
+                return Mathf.Clamp(earnedStars, 0, 3);
+            }
+
+            int basePreviewStars = CalculateStars(runtime.stage, Mathf.Max(0, runtime.currentMoves));
+            int assistUses = assistState != null ? assistState.assistUseCount : 0;
+            int cappedStars = runtime.stage.stageType == StageType.TutorialStage
+                ? basePreviewStars
+                : StageContinuePolicy.ApplyAssistStarCap(basePreviewStars, assistUses);
+            return Mathf.Clamp(Mathf.Max(1, cappedStars), 1, 3);
+        }
+
+        public string GetStarConditionsSummary()
+        {
+            if (runtime.stage == null)
+            {
+                return "Star conditions are unavailable.";
+            }
+
+            int minMoves = runtime.stage.minimumMoves > 0 ? runtime.stage.minimumMoves : runtime.stage.minMoveCount;
+            int threeStarLimit = runtime.stage.starMoveLimit3 > 0 ? runtime.stage.starMoveLimit3 : minMoves;
+            int twoStarLimit = runtime.stage.starMoveLimit2 > 0 ? runtime.stage.starMoveLimit2 : minMoves + 2;
+            int oneStarLimit = runtime.stage.starMoveLimit1 > 0 ? runtime.stage.starMoveLimit1 : runtime.stage.moveLimit;
+
+            return $"3 Stars\n- Within {threeStarLimit} moves\n- No help items used\n\n"
+                + $"2 Stars\n- Within {twoStarLimit} moves\n- Or after using 1-2 help items\n\n"
+                + $"1 Star\n- Clear within {oneStarLimit} moves\n- Or after additional help item penalties";
+        }
+
+        public int GetThreeStarMoveLimit()
+        {
+            if (runtime.stage == null)
+            {
+                return 0;
+            }
+
+            int minMoves = runtime.stage.minimumMoves > 0 ? runtime.stage.minimumMoves : runtime.stage.minMoveCount;
+            return runtime.stage.starMoveLimit3 > 0 ? runtime.stage.starMoveLimit3 : minMoves;
         }
 
         public void ContinueAfterAd()
         {
-            if (!CanContinueAfterAd())
+            ContinueAfterAd(null);
+        }
+
+        public void ContinueAfterAd(Action<RewardedAdResult> onCompleted)
+        {
+            if (state != StagePlayState.Failed || assistState == null)
             {
+                onCompleted?.Invoke(RewardedAdResult.Unavailable);
+                return;
+            }
+
+            if (assistState.adContinueCount >= StageContinueMaxPerRun)
+            {
+                SetState(StagePlayState.Failed, "Stage continue limit reached.");
+                onCompleted?.Invoke(RewardedAdResult.LimitReached);
+                return;
+            }
+
+            if (rewardService == null || !rewardService.IsPlacementAvailable(RewardedAdPlacement.OutOfMovesPlus2))
+            {
+                SetState(StagePlayState.Failed, "Ad is not available yet.");
+                onCompleted?.Invoke(RewardedAdResult.Unavailable);
                 return;
             }
 
             rewardService.Show(
-                RewardedAdPlacement.StageContinue,
+                RewardedAdPlacement.OutOfMovesPlus2,
                 () =>
                 {
                     if (state != StagePlayState.Failed)
@@ -352,12 +466,19 @@ namespace CubeChallenge3D.GameModes.Stages
                         return;
                     }
 
+                    int moveLimitBefore = runtime.moveLimit;
                     StageContinuePolicy.ApplyAdContinue(assistState, StageContinueMovesReward);
                     runtime.moveLimit = assistState.currentMoveLimit;
                     runtime.remainingMoves = Mathf.Max(0, runtime.moveLimit - runtime.currentMoves);
                     runtime.isFailed = false;
                     runtime.isPlaying = true;
                     cubeController.SetUserInputEnabled(true);
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+                    Debug.Log(
+                        $"[RewardedExtraMoves] stageMode={runtime.stage?.stageType} stageNumber={runtime.stage?.stageNumber} "
+                        + $"movesUsed={runtime.currentMoves} moveLimitBefore={moveLimitBefore} moveLimitAfter={runtime.moveLimit} "
+                        + $"extraMovesUsed={assistState.adContinueCount} rewardReceived=True popupClosed=True resumeState=Playing");
+#endif
                     SetState(StagePlayState.Playing, $"Reward claimed. Continued with +{StageContinueMovesReward} moves.");
                 },
                 result =>
@@ -368,6 +489,8 @@ namespace CubeChallenge3D.GameModes.Stages
                             ? "Ad failed to load."
                             : "Ad not completed.");
                     }
+
+                    onCompleted?.Invoke(result);
                 });
         }
 
@@ -434,6 +557,7 @@ namespace CubeChallenge3D.GameModes.Stages
             }
 
             assistState.hintCount++;
+            assistState.assistUseCount++;
             assistState.usedHint = true;
             lastHint = StageHintPolicy.BuildHint(runtime.stage, cubeController.MoveHistory.GetMoves(), runtime.remainingMoves);
             SetState(StagePlayState.Playing, lastHint.message);
@@ -480,15 +604,22 @@ namespace CubeChallenge3D.GameModes.Stages
 
         private void CheckSuccessOrFailure()
         {
-            if (runtime.currentMoves > runtime.moveLimit)
+            bool goalReached = IsStageGoalReached();
+            if (goalReached)
             {
-                FailStage();
+                CompleteStage();
                 return;
             }
 
-            if (IsStageGoalReached())
+            if (runtime.currentMoves >= runtime.moveLimit)
             {
-                CompleteStage();
+                FailStage();
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+                Debug.Log(
+                    $"[StageMoveLimit] mode={runtime.stage?.stageType} stage={runtime.stage?.stageNumber} "
+                    + $"movesUsed={runtime.currentMoves} moveLimit={runtime.moveLimit} "
+                    + $"beforeInputBlocked=False moveApplied=True goalReached=False showOutOfMoves=True");
+#endif
             }
         }
 
@@ -500,14 +631,29 @@ namespace CubeChallenge3D.GameModes.Stages
             previousBestStars = previousProgress != null ? previousProgress.stars : 0;
             baseStars = CalculateStars(runtime.stage, runtime.currentMoves);
             int assistUses = assistState != null ? assistState.assistUseCount : 0;
-            maxStarsAllowed = assistUses >= 3 ? 1 : assistUses >= 1 ? 2 : 3;
-            earnedStars = StageContinuePolicy.ApplyAssistStarCap(baseStars, assistUses);
+            maxStarsAllowed = runtime.stage.stageType == StageType.TutorialStage
+                ? 3
+                : assistUses >= 3 ? 1 : assistUses >= 1 ? 2 : 3;
+            earnedStars = runtime.stage.stageType == StageType.TutorialStage
+                ? baseStars
+                : StageContinuePolicy.ApplyAssistStarCap(baseStars, assistUses);
             bestStarsUpdated = earnedStars > previousBestStars;
-            earnedCoins = GetClearCoinReward(runtime.stage, earnedStars);
+            earnedCoins = GetClearCoinReward(earnedStars, previousBestStars);
             cubeController.SetUserInputEnabled(false);
             progressStore.MarkCleared(runtime.stage.stageId, runtime.currentMoves, runtime.elapsedSeconds, earnedStars);
-            walletStore?.AddCoins(earnedCoins);
+            StageInterstitialPolicy.RecordStageClear(runtime.stage);
+            if (earnedCoins > 0)
+            {
+                walletStore?.AddCoins(earnedCoins);
+            }
+            AudioFeedbackManager.PlayClearVibration();
             UnlockNextStage();
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            Debug.Log(
+                $"[StageReward] mode={runtime.stage.stageType} stage={runtime.stage.stageNumber} "
+                + $"earnedStars={earnedStars} previousBestStars={previousBestStars} "
+                + $"coinReward={earnedCoins} isFirstClear={previousBestStars <= 0} isUpgrade={earnedStars > previousBestStars}");
+#endif
             SetState(StagePlayState.Cleared, "Clear!");
         }
 
@@ -527,7 +673,7 @@ namespace CubeChallenge3D.GameModes.Stages
             runtime.remainingMoves = runtime.moveLimit;
             runtime.isPlaying = true;
             cubeController.SetUserInputEnabled(true);
-            string message = runtime.stage.stageType == StageType.ReverseTargetStage
+            string message = IsTargetPatternStage(runtime.stage)
                 ? "Make the target pattern."
                 : "Solve the cube.";
             SetState(StagePlayState.Playing, message);
@@ -540,7 +686,7 @@ namespace CubeChallenge3D.GameModes.Stages
                 return false;
             }
 
-            if (runtime.stage.stageType == StageType.ReverseTargetStage)
+            if (IsTargetPatternStage(runtime.stage))
             {
                 return targetState != null && cubeController.CurrentState.Equals(targetState);
             }
@@ -653,20 +799,11 @@ namespace CubeChallenge3D.GameModes.Stages
             }
         }
 
-        private static int GetClearCoinReward(StageData stage, int stars)
+        private static int GetClearCoinReward(int earnedStars, int previousBestStars)
         {
-            int fullReward = stage != null && stage.rewardCoins > 0 ? stage.rewardCoins : 80;
-            switch (stars)
-            {
-                case 3:
-                    return fullReward;
-                case 2:
-                    return Mathf.Max(1, Mathf.RoundToInt(fullReward * 0.75f));
-                case 1:
-                    return Mathf.Max(1, Mathf.RoundToInt(fullReward * 0.5f));
-                default:
-                    return 0;
-            }
+            int earnedReward = EconomyBalanceConfig.GetStageClearCoinsForStars(earnedStars);
+            int previousReward = EconomyBalanceConfig.GetStageClearCoinsForStars(previousBestStars);
+            return Mathf.Max(0, earnedReward - previousReward);
         }
 
         private void UnlockNextStage()
@@ -697,14 +834,18 @@ namespace CubeChallenge3D.GameModes.Stages
             }
 
             return dataLoader.LoadAllStages()
-                .Where(stage => stage.stageNumber > runtime.stage.stageNumber)
+                .Where(stage => stage.stageType == runtime.stage.stageType
+                    && stage.stageNumber > runtime.stage.stageNumber)
                 .OrderBy(stage => stage.stageNumber)
                 .FirstOrDefault();
         }
 
         private static bool IsPlayableStageType(StageType type)
         {
-            return type == StageType.SolveStage || type == StageType.ReverseTargetStage;
+            return type == StageType.TutorialStage
+                || type == StageType.SolveStage
+                || type == StageType.ReverseTargetStage
+                || type == StageType.InfinityStage;
         }
 
         private static string BuildTargetSummary(StageData stage)
@@ -714,12 +855,19 @@ namespace CubeChallenge3D.GameModes.Stages
                 return string.Empty;
             }
 
-            if (stage.stageType == StageType.SolveStage)
+            if (!IsTargetPatternStage(stage))
             {
                 return "Goal: Solve the cube";
             }
 
             return "Goal: Make the target pattern";
+        }
+
+        public static bool IsTargetPatternStage(StageData stage)
+        {
+            return stage != null
+                && (stage.stageType == StageType.ReverseTargetStage
+                    || stage.stageType == StageType.InfinityStage && string.IsNullOrWhiteSpace(stage.scrambleNotation));
         }
 
         private void SetState(StagePlayState nextState, string message)

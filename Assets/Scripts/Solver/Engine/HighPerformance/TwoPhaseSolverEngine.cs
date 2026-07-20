@@ -115,7 +115,7 @@ namespace CubeChallenge3D.Solver.Engine.HighPerformance
                     message = moves.Length == 0 ? "Cube is already solved." : "Solution found.",
                     moveNotations = moves,
                     solutionNotation = string.Join(" ", moves),
-                    moveCount = moves.Length,
+                    moveCount = MoveUtility.CountPlayerTurns(moves),
                     elapsedMs = (int)stopwatch.ElapsedMilliseconds,
                     engineName = EngineName,
                     maxDepth = maxDepth,

@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using CubeChallenge3D.Audio;
 using CubeChallenge3D.Cube.Model;
 using CubeChallenge3D.Cube.Utils;
 using CubeChallenge3D.Cube.View;
@@ -35,6 +36,16 @@ namespace CubeChallenge3D.Cube.Runtime
         public event Action<CubeMove> UserMoveApplied;
         public event Action<CubeMove> UndoApplied;
         public event Action ScrambleCompleted;
+
+        private void OnEnable()
+        {
+            AudioFeedbackManager.BindCubeController(this);
+        }
+
+        private void OnDisable()
+        {
+            AudioFeedbackManager.UnbindCubeController(this);
+        }
 
         public void InitializeSolved()
         {
@@ -98,6 +109,7 @@ namespace CubeChallenge3D.Cube.Runtime
 
             NotifyMoveCountChanged();
             UndoApplied?.Invoke(move);
+            AudioFeedbackManager.MarkNextCubeRotationAsUndo();
             StartCoroutine(ApplySingleMove(MoveUtility.Inverse(move), false));
         }
 
@@ -120,6 +132,27 @@ namespace CubeChallenge3D.Cube.Runtime
             }
 
             StartCoroutine(ScrambleFromSolvedSequence(new List<CubeMove>(moves)));
+        }
+
+        public void ApplyScrambleFromSolvedInstant(IEnumerable<CubeMove> moves)
+        {
+            if (IsBusy || moves == null)
+            {
+                return;
+            }
+
+            EnsureVisualBuilder();
+            List<CubeMove> moveList = new List<CubeMove>(moves);
+            CubeState state = CubeState.CreateSolved();
+            state.ApplyMoves(moveList);
+            CurrentState = state;
+            visualBuilder.Build(CurrentState);
+            moveHistory.Clear();
+            LastMove = null;
+            lastScrambleMoves.Clear();
+            lastScrambleMoves.AddRange(moveList);
+            NotifyMoveCountChanged();
+            ScrambleCompleted?.Invoke();
         }
 
         public void SetUserInputEnabled(bool enabled)
@@ -252,7 +285,8 @@ namespace CubeChallenge3D.Cube.Runtime
                 yield break;
             }
 
-            List<CubieVisual> targets = FindTargetCubies(cubeRoot, move.Face);
+            AudioFeedbackManager.PlayCubeRotation();
+            List<CubieVisual> targets = FindTargetCubies(cubeRoot, move.Axis, move.LayerIndex);
             Transform pivot = new GameObject($"Pivot_{move}").transform;
             pivot.SetParent(cubeRoot, false);
 
@@ -261,10 +295,9 @@ namespace CubeChallenge3D.Cube.Runtime
                 cubie.transform.SetParent(pivot, true);
             }
 
-            // Clockwise means clockwise while looking directly at the face from outside.
-            // That is a negative rotation around the face's outward normal.
-            Vector3 axis = CubeFaceletMapping.FaceNormal(move.Face);
-            float targetAngle = -90f * move.QuarterTurns;
+            // All visual and model turns use right-hand rotation around the positive axis.
+            Vector3 axis = GetAxisVector(move.Axis);
+            float targetAngle = 90f * move.AxisQuarterTurns;
             Quaternion startRotation = Quaternion.identity;
             Quaternion endRotation = Quaternion.AngleAxis(targetAngle, axis);
 
@@ -318,13 +351,16 @@ namespace CubeChallenge3D.Cube.Runtime
             }
         }
 
-        private static List<CubieVisual> FindTargetCubies(Transform cubeRoot, CubeFace face)
+        private static List<CubieVisual> FindTargetCubies(
+            Transform cubeRoot,
+            CubeAxis axis,
+            int layerIndex)
         {
             CubieVisual[] cubies = cubeRoot.GetComponentsInChildren<CubieVisual>();
             var result = new List<CubieVisual>(9);
             foreach (CubieVisual cubie in cubies)
             {
-                if (IsOnFace(cubie.CurrentGridPosition, face))
+                if (GetAxisValue(cubie.CurrentGridPosition, axis) == layerIndex)
                 {
                     result.Add(cubie);
                 }
@@ -333,50 +369,58 @@ namespace CubeChallenge3D.Cube.Runtime
             return result;
         }
 
-        private static bool IsOnFace(Vector3Int position, CubeFace face)
+        private static int GetAxisValue(Vector3Int position, CubeAxis axis)
         {
-            switch (face)
+            switch (axis)
             {
-                case CubeFace.Right: return position.x == 1;
-                case CubeFace.Left: return position.x == -1;
-                case CubeFace.Up: return position.y == 1;
-                case CubeFace.Down: return position.y == -1;
-                case CubeFace.Front: return position.z == 1;
-                case CubeFace.Back: return position.z == -1;
-                default: throw new ArgumentOutOfRangeException(nameof(face), face, null);
+                case CubeAxis.X: return position.x;
+                case CubeAxis.Y: return position.y;
+                case CubeAxis.Z: return position.z;
+                default: throw new ArgumentOutOfRangeException(nameof(axis), axis, null);
             }
         }
 
         private static Vector3Int RotateGridPosition(Vector3Int position, CubeMove move)
         {
-            Vector3Int axis = GetFaceAxis(move.Face);
-            int clockwiseTurns = move.QuarterTurns == -1 ? 3 : move.QuarterTurns;
+            Vector3Int axis = GetAxisVectorInt(move.Axis);
+            int positiveTurns = move.AxisQuarterTurns == -1 ? 3 : move.AxisQuarterTurns;
             Vector3Int result = position;
-            for (int i = 0; i < clockwiseTurns; i++)
+            for (int i = 0; i < positiveTurns; i++)
             {
-                result = RotateClockwise(result, axis);
+                result = RotatePositive(result, axis);
             }
 
             return result;
         }
 
-        private static Vector3Int GetFaceAxis(CubeFace face)
+        private static Vector3 GetAxisVector(CubeAxis axis)
         {
-            Vector3 normal = CubeFaceletMapping.FaceNormal(face);
-            return new Vector3Int(
-                Mathf.RoundToInt(normal.x),
-                Mathf.RoundToInt(normal.y),
-                Mathf.RoundToInt(normal.z));
+            switch (axis)
+            {
+                case CubeAxis.X: return Vector3.right;
+                case CubeAxis.Y: return Vector3.up;
+                case CubeAxis.Z: return Vector3.forward;
+                default: throw new ArgumentOutOfRangeException(nameof(axis), axis, null);
+            }
         }
 
-        private static Vector3Int RotateClockwise(Vector3Int value, Vector3Int axis)
+        private static Vector3Int GetAxisVectorInt(CubeAxis axis)
+        {
+            Vector3 value = GetAxisVector(axis);
+            return new Vector3Int(
+                Mathf.RoundToInt(value.x),
+                Mathf.RoundToInt(value.y),
+                Mathf.RoundToInt(value.z));
+        }
+
+        private static Vector3Int RotatePositive(Vector3Int value, Vector3Int axis)
         {
             var cross = new Vector3Int(
                 (axis.y * value.z) - (axis.z * value.y),
                 (axis.z * value.x) - (axis.x * value.z),
                 (axis.x * value.y) - (axis.y * value.x));
             int dot = (axis.x * value.x) + (axis.y * value.y) + (axis.z * value.z);
-            return -cross + (axis * dot);
+            return cross + (axis * dot);
         }
 
         private void SnapCubie(CubieVisual cubie, Vector3Int gridPosition)

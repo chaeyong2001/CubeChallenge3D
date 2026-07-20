@@ -23,6 +23,7 @@ namespace CubeChallenge3D.Ranking
     public sealed class CachedRankingStore
     {
         private const string FileName = "cached_ranking_records.json";
+        private const int RankingAvatarSaveVersion = 3;
 
         private CachedRankingData data;
 
@@ -63,8 +64,9 @@ namespace CubeChallenge3D.Ranking
         public void Load()
         {
             data = SaveService.LoadJson(FileName, new CachedRankingData());
-            bool changed = data.saveVersion < SaveDataValidator.CurrentSaveVersion;
-            data.saveVersion = SaveDataValidator.CurrentSaveVersion;
+            bool migrateMissingAvatarIds = data.saveVersion < RankingAvatarSaveVersion;
+            bool changed = data.saveVersion < RankingAvatarSaveVersion;
+            data.saveVersion = Math.Max(SaveDataValidator.CurrentSaveVersion, RankingAvatarSaveVersion);
             List<CachedRankingEntry> source = data.entries ?? new List<CachedRankingEntry>();
             data.entries = source
                 .Where(entry => entry != null && !string.IsNullOrWhiteSpace(entry.challengeId))
@@ -76,6 +78,7 @@ namespace CubeChallenge3D.Ranking
                 entry.topList = (entry.topList ?? new List<RankingSubmission>())
                     .Where(item => item != null)
                     .ToList();
+                changed |= NormalizeAvatarIds(entry.topList, migrateMissingAvatarIds);
             }
             if (changed || data.entries.Count != source.Count)
             {
@@ -86,6 +89,31 @@ namespace CubeChallenge3D.Ranking
         public void Save()
         {
             SaveService.SaveJson(FileName, data);
+        }
+
+        private static bool NormalizeAvatarIds(IEnumerable<RankingSubmission> submissions, bool migrateMissingAvatarIds)
+        {
+            bool changed = false;
+            foreach (RankingSubmission submission in submissions)
+            {
+                if (submission == null)
+                {
+                    continue;
+                }
+
+                if (migrateMissingAvatarIds)
+                {
+                    submission.avatarId = -1;
+                    changed = true;
+                }
+                else if (submission.avatarId < -1 || submission.avatarId > 3)
+                {
+                    submission.avatarId = -1;
+                    changed = true;
+                }
+            }
+
+            return changed;
         }
     }
 }

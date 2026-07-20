@@ -60,6 +60,9 @@ namespace CubeChallenge3D.Ads
 #if GOOGLE_MOBILE_ADS
             if (!IsReady(placement))
             {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+                Debug.Log($"[AdShow] placement={placement}, type=rewarded, ready=false, result=not_ready");
+#endif
                 Load(placement);
                 onFailed?.Invoke();
                 return;
@@ -77,6 +80,9 @@ namespace CubeChallenge3D.Ads
                 }
 
                 completed = true;
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+                Debug.Log($"[AdShow] placement={placement}, type=rewarded, ready=true, result=failed");
+#endif
                 ad.Destroy();
                 onFailed?.Invoke();
                 Load(placement);
@@ -86,6 +92,9 @@ namespace CubeChallenge3D.Ads
                 if (!completed)
                 {
                     completed = true;
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+                    Debug.Log($"[AdShow] placement={placement}, type=rewarded, ready=true, result=closed");
+#endif
                     onClosed?.Invoke();
                 }
 
@@ -101,6 +110,9 @@ namespace CubeChallenge3D.Ads
                 }
 
                 completed = true;
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+                Debug.Log($"[AdRewardEarned] placement={placement}, rewardType=rewarded, rewardAmount=1");
+#endif
                 onRewarded?.Invoke();
             });
 #else
@@ -133,7 +145,7 @@ namespace CubeChallenge3D.Ads
                 loadingPlacements.Remove(placement);
                 if (error != null || ad == null)
                 {
-                    Debug.LogWarning($"Rewarded ad load failed for {placement}: {error}");
+                    Debug.LogWarning($"[AdLoad] type=rewarded, placement={placement}, unitId={adUnitId}, success=False, error={error}");
                     return;
                 }
 
@@ -143,6 +155,9 @@ namespace CubeChallenge3D.Ads
                 }
 
                 loadedAds[placement] = ad;
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+                Debug.Log($"[AdLoad] type=rewarded, placement={placement}, unitId={adUnitId}, success=True, error=");
+#endif
             });
 #endif
         }

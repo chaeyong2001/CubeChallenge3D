@@ -7,8 +7,17 @@ namespace CubeChallenge3D.Stages.Generation
 {
     public sealed class StagePackGenerator
     {
+        public const int NormalStageCount = 300;
+        public const int HardStageCount = 100;
+        public const int InfinityStageCount = 500;
+        public const int TutorialStageCount = 10;
+        public const int HardFirstStageNumber = NormalStageCount + 1;
+        public const int InfinityFirstStageNumber = NormalStageCount + HardStageCount + 1;
+        public const int TutorialFirstStageNumber = NormalStageCount + HardStageCount + InfinityStageCount + 1;
+        public const int DefaultTutorialSeed = 14901;
         public const int DefaultSolveSeed = 15001;
         public const int DefaultTargetSeed = 15101;
+        public const int DefaultInfinitySeed = 15201;
         private const int MaxCandidateRetries = 500;
         private static readonly CubeFace[] Faces =
         {
@@ -23,16 +32,108 @@ namespace CubeChallenge3D.Stages.Generation
             return Generate(count, seed, StageType.SolveStage, 1, "solve_pack_v1");
         }
 
+        public List<StageData> GenerateTutorialStages(int count, int seed)
+        {
+            return Generate(count, seed, StageType.TutorialStage, TutorialFirstStageNumber, "tutorial_pack_v1");
+        }
+
         public List<StageData> GenerateReverseTargetStages(int count, int seed)
         {
-            return Generate(count, seed, StageType.ReverseTargetStage, 101, "target_pack_v1");
+            return Generate(count, seed, StageType.ReverseTargetStage, HardFirstStageNumber, "target_pack_v1");
+        }
+
+        public List<StageData> GenerateInfinityStages(int count, int seed)
+        {
+            if (count <= 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(count));
+            }
+
+            var random = new Random(seed);
+            var stages = new List<StageData>(count);
+            var sequenceKeys = new HashSet<string>(StringComparer.Ordinal);
+            var stateKeys = new HashSet<string>(StringComparer.Ordinal);
+            List<bool> targetPatternSlots = BuildInfinityPatternSlots(count, random);
+            int previousLength = 5;
+
+            for (int index = 0; index < count; index++)
+            {
+                int localNumber = index + 1;
+                bool targetPattern = targetPatternSlots[index];
+                int scaledLocalNumber = 21 + ((localNumber - 1) % 280);
+                int targetLength = Math.Max(previousLength, GetTargetLength(scaledLocalNumber, targetPattern ? StageType.ReverseTargetStage : StageType.SolveStage, random));
+                StageData stage = null;
+
+                for (int retry = 0; retry < MaxCandidateRetries; retry++)
+                {
+                    List<CubeMove> moves = GenerateMoves(targetLength, random);
+                    string notation = MoveUtility.ToNotationSequence(moves);
+                    CubeState generatedState = CubeState.CreateSolved();
+                    generatedState.ApplyMoves(moves);
+                    string facelets = CubeStateSerializer.ToFaceletString(generatedState);
+                    string uniqueKey = $"{(targetPattern ? "target" : "solve")}:{notation}";
+
+                    if (sequenceKeys.Contains(uniqueKey) || stateKeys.Contains(facelets))
+                    {
+                        continue;
+                    }
+
+                    if (CanSolveWithin(generatedState, 4))
+                    {
+                        continue;
+                    }
+
+                    sequenceKeys.Add(uniqueKey);
+                    stateKeys.Add(facelets);
+                    stage = BuildInfinityStage(
+                        localNumber,
+                        InfinityFirstStageNumber + index,
+                        seed + index,
+                        targetPattern,
+                        moves,
+                        facelets);
+                    break;
+                }
+
+                if (stage == null)
+                {
+                    throw new InvalidOperationException($"Failed to generate unique infinity stage {localNumber}.");
+                }
+
+                stages.Add(stage);
+                previousLength = targetLength;
+            }
+
+            return stages;
+        }
+
+        private static List<bool> BuildInfinityPatternSlots(int count, Random random)
+        {
+            int targetCount = count / 4;
+            var slots = new List<bool>(count);
+            for (int i = 0; i < count; i++)
+            {
+                slots.Add(i < targetCount);
+            }
+
+            for (int i = slots.Count - 1; i > 0; i--)
+            {
+                int swapIndex = random.Next(i + 1);
+                bool value = slots[i];
+                slots[i] = slots[swapIndex];
+                slots[swapIndex] = value;
+            }
+
+            return slots;
         }
 
         public StageDataCollection GenerateFullStagePack()
         {
             var collection = new StageDataCollection();
-            collection.stages.AddRange(GenerateSolveStages(100, DefaultSolveSeed));
-            collection.stages.AddRange(GenerateReverseTargetStages(100, DefaultTargetSeed));
+            collection.stages.AddRange(GenerateTutorialStages(TutorialStageCount, DefaultTutorialSeed));
+            collection.stages.AddRange(GenerateSolveStages(NormalStageCount, DefaultSolveSeed));
+            collection.stages.AddRange(GenerateReverseTargetStages(HardStageCount, DefaultTargetSeed));
+            collection.stages.AddRange(GenerateInfinityStages(InfinityStageCount, DefaultInfinitySeed));
             return collection;
         }
 
@@ -112,13 +213,17 @@ namespace CubeChallenge3D.Stages.Generation
             IReadOnlyList<CubeMove> moves,
             string generatedFacelets)
         {
-            int minimumMoves = moves.Count;
+            int minimumMoves = MoveUtility.CountPlayerTurns(moves);
             StageDifficulty difficulty = GetDifficulty(localNumber);
-            int extraMoves = GetExtraMoves(localNumber, minimumMoves);
-            int moveLimit = minimumMoves + extraMoves;
-            string idPrefix = type == StageType.SolveStage ? "solve" : "target";
+            string idPrefix = GetStageIdPrefix(type);
             string previousId = localNumber > 1 ? $"{idPrefix}_{localNumber - 1:000}" : string.Empty;
             string notation = MoveUtility.ToNotationSequence(moves);
+            bool solvePattern = type == StageType.SolveStage || type == StageType.TutorialStage;
+            bool tutorial = type == StageType.TutorialStage;
+            GetStarMoveOffsets(type, localNumber, out int threeStarOffset, out int twoStarOffset, out int oneStarOffset);
+            int starMoveLimit3 = minimumMoves + threeStarOffset;
+            int starMoveLimit2 = minimumMoves + twoStarOffset;
+            int moveLimit = minimumMoves + oneStarOffset;
 
             return new StageData
             {
@@ -126,18 +231,18 @@ namespace CubeChallenge3D.Stages.Generation
                 stageNumber = stageNumber,
                 stageType = type,
                 difficulty = difficulty,
-                title = type == StageType.SolveStage ? $"Solve {localNumber:000}" : $"Target {localNumber:000}",
-                description = type == StageType.SolveStage
+                title = tutorial ? $"Tutorial {localNumber:000}" : type == StageType.SolveStage ? $"Solve {localNumber:000}" : $"Target {localNumber:000}",
+                description = solvePattern
                     ? "Solve the scrambled cube within the move limit."
                     : "Create the target cube pattern within the move limit.",
-                startStateFacelets = type == StageType.SolveStage
+                startStateFacelets = solvePattern
                     ? generatedFacelets
                     : CubeStateSerializer.ToFaceletString(CubeState.CreateSolved()),
-                targetStateFacelets = type == StageType.SolveStage
+                targetStateFacelets = solvePattern
                     ? CubeStateSerializer.ToFaceletString(CubeState.CreateSolved())
                     : generatedFacelets,
-                scrambleNotation = type == StageType.SolveStage ? notation : string.Empty,
-                solutionNotation = type == StageType.SolveStage
+                scrambleNotation = solvePattern ? notation : string.Empty,
+                solutionNotation = solvePattern
                     ? MoveUtility.ToNotationSequence(MoveUtility.InverseSequence(moves))
                     : notation,
                 generatedSeed = generatedSeed,
@@ -145,11 +250,62 @@ namespace CubeChallenge3D.Stages.Generation
                 minimumMoves = minimumMoves,
                 minMoveCount = minimumMoves,
                 moveLimit = moveLimit,
-                starMoveLimit3 = minimumMoves + Math.Max(1, extraMoves / 4),
-                starMoveLimit2 = minimumMoves + Math.Max(2, extraMoves / 2),
+                starMoveLimit3 = starMoveLimit3,
+                starMoveLimit2 = starMoveLimit2,
                 starMoveLimit1 = moveLimit,
                 isUnlockedByDefault = localNumber == 1,
                 unlockAfterStageId = previousId,
+                rewardCoins = GetRewardCoins(difficulty, localNumber)
+            };
+        }
+
+        private static StageData BuildInfinityStage(
+            int localNumber,
+            int stageNumber,
+            int generatedSeed,
+            bool targetPattern,
+            IReadOnlyList<CubeMove> moves,
+            string generatedFacelets)
+        {
+            int minimumMoves = MoveUtility.CountPlayerTurns(moves);
+            int scaledDifficultyStage = 21 + ((localNumber - 1) % 280);
+            StageDifficulty difficulty = GetDifficulty(scaledDifficultyStage);
+            string notation = MoveUtility.ToNotationSequence(moves);
+            GetStarMoveOffsets(StageType.InfinityStage, localNumber, out int threeStarOffset, out int twoStarOffset, out int oneStarOffset);
+            int starMoveLimit3 = minimumMoves + threeStarOffset;
+            int starMoveLimit2 = minimumMoves + twoStarOffset;
+            int moveLimit = minimumMoves + oneStarOffset;
+
+            return new StageData
+            {
+                stageId = $"infinity_{localNumber:000}",
+                stageNumber = stageNumber,
+                stageType = StageType.InfinityStage,
+                difficulty = difficulty,
+                title = targetPattern ? $"Target {localNumber:000}" : $"Solve {localNumber:000}",
+                description = targetPattern
+                    ? "Create the target cube pattern within the move limit."
+                    : "Solve the scrambled cube within the move limit.",
+                startStateFacelets = targetPattern
+                    ? CubeStateSerializer.ToFaceletString(CubeState.CreateSolved())
+                    : generatedFacelets,
+                targetStateFacelets = targetPattern
+                    ? generatedFacelets
+                    : CubeStateSerializer.ToFaceletString(CubeState.CreateSolved()),
+                scrambleNotation = targetPattern ? string.Empty : notation,
+                solutionNotation = targetPattern
+                    ? notation
+                    : MoveUtility.ToNotationSequence(MoveUtility.InverseSequence(moves)),
+                generatedSeed = generatedSeed,
+                generationGroup = targetPattern ? "infinity_target_pack_v1" : "infinity_solve_pack_v1",
+                minimumMoves = minimumMoves,
+                minMoveCount = minimumMoves,
+                moveLimit = moveLimit,
+                starMoveLimit3 = starMoveLimit3,
+                starMoveLimit2 = starMoveLimit2,
+                starMoveLimit1 = moveLimit,
+                isUnlockedByDefault = localNumber == 1,
+                unlockAfterStageId = localNumber > 1 ? $"infinity_{localNumber - 1:000}" : string.Empty,
                 rewardCoins = GetRewardCoins(difficulty, localNumber)
             };
         }
@@ -186,57 +342,155 @@ namespace CubeChallenge3D.Stages.Generation
         {
             int min;
             int max;
-            if (stageNumber <= 10)
+            int localStage = Math.Max(1, stageNumber);
+            if (type == StageType.TutorialStage)
             {
                 min = 5;
-                max = type == StageType.SolveStage ? 7 : 6;
+                max = 6;
             }
-            else if (stageNumber <= 30)
+            else if (type == StageType.SolveStage && localStage > 100)
+            {
+                min = 20 + ((localStage - 101) / 50) * 2;
+                max = 24 + ((localStage - 101) / 50) * 2;
+            }
+            else if (localStage <= 10)
+            {
+                min = 5;
+                max = 7;
+            }
+            else if (localStage <= 30)
             {
                 min = 7;
-                max = type == StageType.SolveStage ? 10 : 9;
+                max = 10;
             }
-            else if (stageNumber <= 60)
+            else if (localStage <= 60)
             {
                 min = 10;
-                max = type == StageType.SolveStage ? 14 : 13;
+                max = 14;
             }
             else
             {
                 min = 14;
-                max = type == StageType.SolveStage ? 20 : 19;
+                max = 20;
             }
 
-            double progress = (stageNumber - 1) / 99.0;
+            double progress = Math.Min(1.0, (localStage - 1) / 99.0);
             int preferred = min + (int)Math.Round((max - min) * progress);
             return Math.Max(min, Math.Min(max, preferred + random.Next(-1, 2)));
         }
 
-        private static int GetExtraMoves(int stageNumber, int minimumMoves)
+        private static string GetStageIdPrefix(StageType type)
         {
-            if (stageNumber <= 10)
+            switch (type)
             {
-                return Math.Max(7, 14 - minimumMoves);
+                case StageType.TutorialStage:
+                    return "tutorial";
+                case StageType.SolveStage:
+                    return "solve";
+                default:
+                    return "target";
             }
+        }
 
-            if (stageNumber <= 30)
+        private static void GetStarMoveOffsets(
+            StageType type,
+            int localNumber,
+            out int threeStarOffset,
+            out int twoStarOffset,
+            out int oneStarOffset)
+        {
+            int stage = Math.Max(1, localNumber);
+            switch (type)
             {
-                return 6;
-            }
+                case StageType.TutorialStage:
+                    threeStarOffset = 5;
+                    twoStarOffset = 7;
+                    oneStarOffset = 9;
+                    return;
+                case StageType.SolveStage:
+                    if (stage <= 10)
+                    {
+                        threeStarOffset = 4;
+                        twoStarOffset = 6;
+                        oneStarOffset = 8;
+                        return;
+                    }
 
-            if (stageNumber <= 60)
-            {
-                return 5;
-            }
+                    if (stage <= 50)
+                    {
+                        threeStarOffset = 3;
+                        twoStarOffset = 5;
+                        oneStarOffset = 7;
+                        return;
+                    }
 
-            return 4;
+                    if (stage <= 150)
+                    {
+                        threeStarOffset = 2;
+                        twoStarOffset = 4;
+                        oneStarOffset = 6;
+                        return;
+                    }
+
+                    threeStarOffset = 1;
+                    twoStarOffset = 3;
+                    oneStarOffset = 5;
+                    return;
+                case StageType.ReverseTargetStage:
+                    if (stage <= 20)
+                    {
+                        threeStarOffset = 3;
+                        twoStarOffset = 5;
+                        oneStarOffset = 7;
+                        return;
+                    }
+
+                    if (stage <= 60)
+                    {
+                        threeStarOffset = 2;
+                        twoStarOffset = 4;
+                        oneStarOffset = 6;
+                        return;
+                    }
+
+                    threeStarOffset = 1;
+                    twoStarOffset = 3;
+                    oneStarOffset = 5;
+                    return;
+                case StageType.InfinityStage:
+                    if (stage <= 50)
+                    {
+                        threeStarOffset = 3;
+                        twoStarOffset = 5;
+                        oneStarOffset = 7;
+                        return;
+                    }
+
+                    if (stage <= 150)
+                    {
+                        threeStarOffset = 2;
+                        twoStarOffset = 4;
+                        oneStarOffset = 6;
+                        return;
+                    }
+
+                    threeStarOffset = 1;
+                    twoStarOffset = 3;
+                    oneStarOffset = 5;
+                    return;
+                default:
+                    threeStarOffset = 2;
+                    twoStarOffset = 4;
+                    oneStarOffset = 6;
+                    return;
+            }
         }
 
         private static StageDifficulty GetDifficulty(int stageNumber)
         {
             if (stageNumber <= 20) return StageDifficulty.Easy;
-            if (stageNumber <= 50) return StageDifficulty.Normal;
-            if (stageNumber <= 80) return StageDifficulty.Hard;
+            if (stageNumber <= 125) return StageDifficulty.Normal;
+            if (stageNumber <= 230) return StageDifficulty.Hard;
             return StageDifficulty.Expert;
         }
 

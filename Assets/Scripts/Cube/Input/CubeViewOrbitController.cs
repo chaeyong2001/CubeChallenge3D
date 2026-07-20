@@ -19,6 +19,7 @@ namespace CubeChallenge3D.Cube.Input
         [SerializeField] private float minimumZoom = 0.62f;
         [SerializeField] private float maximumZoom = 1.45f;
         [SerializeField] private float snapDuration = 0.25f;
+        [SerializeField] private Vector3 viewOffset = Vector3.zero;
         [SerializeField] private CubeInteractionMode interactionMode = CubeInteractionMode.View;
 
         private Transform viewRoot;
@@ -40,6 +41,19 @@ namespace CubeChallenge3D.Cube.Input
         public float OrbitSensitivity => orbitSensitivity;
         public float MinDragDistance => minDragDistance;
         public float Zoom => zoom;
+
+        public void SetBaseScale(float portraitScale, float landscapeScale)
+        {
+            portraitBaseScale = Mathf.Max(0.1f, portraitScale);
+            landscapeBaseScale = Mathf.Max(0.1f, landscapeScale);
+            ApplyViewScale();
+        }
+
+        public void SetViewOffset(Vector3 offset)
+        {
+            viewOffset = offset;
+            ApplyViewScale();
+        }
 
         public void SetOrbitSensitivity(float sensitivity)
         {
@@ -310,6 +324,7 @@ namespace CubeChallenge3D.Cube.Input
 
             float baseScale = Screen.height >= Screen.width ? portraitBaseScale : landscapeBaseScale;
             viewRoot.localScale = Vector3.one * (baseScale * zoom);
+            viewRoot.localPosition = viewOffset;
         }
 
         private IEnumerator SnapToSolveMode()
