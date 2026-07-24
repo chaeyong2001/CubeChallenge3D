@@ -62,6 +62,8 @@ namespace CubeChallenge3D.UI
             CreateHeader(logoRoot);
             VerticalLayoutGroup layout = CreateButtonLayout(menuPanel);
             TopCurrencyBar.Attach(canvas, controller.Shop, true);
+            SettingsStore settingsStore = new SettingsStore();
+            LocalizationManager.Instance?.SetLanguageFromCode(settingsStore.Current.languageCode);
 
             Button stages = CreateButton(layout.transform, "stages", "stages", CasualUIColor.Blue, controller.Stages);
             Button ranking = CreateButton(layout.transform, "ranking_challenge", "ranking", CasualUIColor.Purple, controller.RankingChallenge);
@@ -73,7 +75,6 @@ namespace CubeChallenge3D.UI
             Button settings = CreateButton(layout.transform, "settings", "settings", CasualUIColor.Slate, controller.Settings);
 
             ModalPanel comingSoon = new ModalPanel(root.transform, "MainMenuModalCanvas");
-            SettingsStore settingsStore = new SettingsStore();
             PlayerProfileStore profileStore = new PlayerProfileStore();
             ApplyWeeklyRankingAttention(ranking, settingsStore, profileStore);
             PlayerProfileApiClient profileApiClient = new PlayerProfileApiClient(

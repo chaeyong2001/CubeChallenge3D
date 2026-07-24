@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using CubeChallenge3D.Core;
 using CubeChallenge3D.Networking;
 using CubeChallenge3D.Save;
 using CubeChallenge3D.Save.Profile;
@@ -106,7 +107,7 @@ namespace CubeChallenge3D.UI.Records
             CreateColumnHeader(panel);
             rowsContent = CreateRowsArea(panel);
 
-            emptyText = RuntimeUiFactory.CreateText(panel, "EmptyText", "No world records yet.", 34, TextAnchor.MiddleCenter);
+            emptyText = RuntimeUiFactory.CreateText(panel, "EmptyText", T("no_world_records"), 34, TextAnchor.MiddleCenter);
             emptyText.fontStyle = FontStyle.Bold;
             emptyText.color = MutedTextColor;
             SetFixedTopRect(emptyText.rectTransform, 70f, -500f, 820f, 120f);
@@ -121,7 +122,7 @@ namespace CubeChallenge3D.UI.Records
             SetTopRect(localSummaryText.rectTransform, -1500f, 58f, -120f);
             localSummaryText.gameObject.SetActive(false);
 
-            Button close = RuntimeUiFactory.CreateButton(screen, "BackButton", "Back", new Vector2(0f, 72f), new Vector2(336f, 74f));
+            Button close = RuntimeUiFactory.CreateButton(screen, "BackButton", T("back"), new Vector2(0f, 72f), new Vector2(336f, 74f));
             close.onClick.AddListener(Hide);
             Hide();
         }
@@ -351,7 +352,7 @@ namespace CubeChallenge3D.UI.Records
 
         private static HeaderRefs CreateHeader(RectTransform parent)
         {
-            Text title = RuntimeUiFactory.CreateText(parent, "WorldRecordsTitle", "World Records", 76, TextAnchor.MiddleCenter);
+            Text title = RuntimeUiFactory.CreateText(parent, "WorldRecordsTitle", T("world_records_title"), 76, TextAnchor.MiddleCenter);
             title.rectTransform.anchorMin = new Vector2(0.08f, 1f);
             title.rectTransform.anchorMax = new Vector2(0.92f, 1f);
             title.rectTransform.pivot = new Vector2(0.5f, 1f);
@@ -361,7 +362,7 @@ namespace CubeChallenge3D.UI.Records
             title.color = new Color(1f, 0.84f, 0.25f, 1f);
             CasualUIStyle.ApplyTextDepth(title, true);
 
-            Text subtitle = RuntimeUiFactory.CreateText(parent, "WorldRecordsSubtitle", "See who has cleared the most stages.", 28, TextAnchor.MiddleCenter);
+            Text subtitle = RuntimeUiFactory.CreateText(parent, "WorldRecordsSubtitle", T("world_records_subtitle"), 28, TextAnchor.MiddleCenter);
             subtitle.rectTransform.anchorMin = new Vector2(0.08f, 1f);
             subtitle.rectTransform.anchorMax = new Vector2(0.92f, 1f);
             subtitle.rectTransform.pivot = new Vector2(0.5f, 1f);
@@ -430,7 +431,7 @@ namespace CubeChallenge3D.UI.Records
             rect.anchorMax = new Vector2(0.5f, 1f);
             rect.pivot = new Vector2(0.5f, 1f);
             rect.anchoredPosition = new Vector2(0f, -500f);
-            rect.sizeDelta = new Vector2(1008f, 1182f);
+            rect.sizeDelta = new Vector2(1008f, 1258f);
 
             Image image = panelObject.GetComponent<Image>();
             CasualUIStyle.ApplyPanel(image, PanelColor, 34);
@@ -446,10 +447,10 @@ namespace CubeChallenge3D.UI.Records
         private static void CreateColumnHeader(RectTransform panel)
         {
             RectTransform header = CreatePlainRect(panel, "ColumnHeader", new Vector2(0f, -128f), new Vector2(930f, 60f));
-            CreateHeaderText(header, "RankHeader", "Rank", 28, 0f, 0f, 136f, TextAnchor.MiddleCenter);
-            CreateHeaderText(header, "PlayerHeader", "Player", 28, 160f, 0f, 380f, TextAnchor.MiddleLeft);
-            CreateHeaderText(header, "StageHeader", "Stage", 28, 590f, 0f, 140f, TextAnchor.MiddleCenter);
-            CreateHeaderText(header, "StarsHeader", "Stars", 28, 744f, 0f, 170f, TextAnchor.MiddleCenter);
+            CreateHeaderText(header, "RankHeader", T("rank"), 28, 0f, 0f, 136f, TextAnchor.MiddleCenter);
+            CreateHeaderText(header, "PlayerHeader", T("player"), 28, 160f, 0f, 380f, TextAnchor.MiddleLeft);
+            CreateHeaderText(header, "StageHeader", T("stage"), 28, 590f, 0f, 140f, TextAnchor.MiddleCenter);
+            CreateHeaderText(header, "StarsHeader", T("stars"), 28, 744f, 0f, 170f, TextAnchor.MiddleCenter);
         }
 
         private static RectTransform CreateRowsArea(RectTransform parent)
@@ -461,7 +462,7 @@ namespace CubeChallenge3D.UI.Records
             rect.anchorMax = new Vector2(0.5f, 1f);
             rect.pivot = new Vector2(0.5f, 1f);
             rect.anchoredPosition = new Vector2(0f, -198f);
-            rect.sizeDelta = new Vector2(940f, 920f);
+            rect.sizeDelta = new Vector2(940f, 996f);
 
             Image image = scrollObject.GetComponent<Image>();
             CasualUIStyle.ApplyPanel(image, InnerPanelColor, 26);
@@ -846,6 +847,13 @@ namespace CubeChallenge3D.UI.Records
             rect.pivot = new Vector2(0f, 0.5f);
             rect.anchoredPosition = new Vector2(x, y);
             rect.sizeDelta = new Vector2(width, height);
+        }
+
+        private static string T(string key)
+        {
+            return LocalizationManager.Instance != null
+                ? LocalizationManager.Instance.GetText(key)
+                : key;
         }
     }
 }

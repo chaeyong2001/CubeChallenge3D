@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using CubeChallenge3D.Ads;
+using CubeChallenge3D.Core;
 using CubeChallenge3D.Economy;
 using CubeChallenge3D.Inventory;
 using CubeChallenge3D.Stages.Progress;
@@ -80,11 +81,11 @@ namespace CubeChallenge3D.UI.Rewards
             mainMenuButton = RuntimeUiFactory.CreateButton(
                 bottomButtonsRoot,
                 "BackButton",
-                "Back",
+                T("back"),
                 Vector2.zero,
                 RewardsLayout.MainMenuButtonSize);
             CasualUIStyle.ApplyButton(mainMenuButton, CasualUIColor.Blue);
-            SetButtonLabel(mainMenuButton, "Back");
+            SetButtonLabel(mainMenuButton, T("back"));
             Text mainMenuText = mainMenuButton.GetComponentInChildren<Text>();
             if (mainMenuText != null)
             {
@@ -322,7 +323,7 @@ namespace CubeChallenge3D.UI.Rewards
         private void ConfigureCard(RuntimeUiFactory.RewardCardView card, int day, RewardCardState state, bool special)
         {
             DailyRewardDefinition reward = dailyRewardStore.GetRewardForDay(day);
-            card.DayLabel.text = $"Day {day}";
+            card.DayLabel.text = string.Format(T("day_label"), day);
             card.RewardLabel.text = BuildRewardLabel(reward);
             card.RewardLabel.fontSize = special ? 84 : 68;
             card.RewardLabel.resizeTextMinSize = special ? 52 : 44;
@@ -495,7 +496,7 @@ namespace CubeChallenge3D.UI.Rewards
             claimBaseAmountText.text = BuildBaseRewardText(reward);
             claimSolverIcon.sprite = ResolveSolverTicketSprite();
             claimSolverIcon.preserveAspect = true;
-            claimSolverAmountText.text = $"Solver Ticket x{EconomyBalanceConfig.DailySolverTicketBonus}";
+            claimSolverAmountText.text = string.Format(T("solver_ticket_count"), EconomyBalanceConfig.DailySolverTicketBonus);
             claimPopupRoot.gameObject.SetActive(true);
         }
 
@@ -531,7 +532,7 @@ namespace CubeChallenge3D.UI.Rewards
             panelOutline.effectColor = new Color(1f, 0.75f, 0.22f, 0.88f);
             panelOutline.effectDistance = new Vector2(4f, -4f);
 
-            Text title = RuntimeUiFactory.CreateText(panel, "Title", "Reward Claimed!", 48, TextAnchor.MiddleCenter);
+            Text title = RuntimeUiFactory.CreateText(panel, "Title", T("reward_claimed_title"), 48, TextAnchor.MiddleCenter);
             title.rectTransform.anchorMin = new Vector2(0.08f, 1f);
             title.rectTransform.anchorMax = new Vector2(0.92f, 1f);
             title.rectTransform.pivot = new Vector2(0.5f, 1f);
@@ -608,15 +609,15 @@ namespace CubeChallenge3D.UI.Rewards
             switch (reward.type)
             {
                 case DailyRewardType.Coins:
-                    return $"{reward.amount} Coins\n+{EconomyBalanceConfig.DailySolverTicketBonus} Solver Tickets";
+                    return $"{reward.amount} {T("coins")}\n+{EconomyBalanceConfig.DailySolverTicketBonus} {T("solver_tickets")}";
                 case DailyRewardType.Gems:
-                    return $"{reward.amount} Gems\n+{EconomyBalanceConfig.DailySolverTicketBonus} Solver Tickets";
+                    return $"{reward.amount} {T("gems")}\n+{EconomyBalanceConfig.DailySolverTicketBonus} {T("solver_tickets")}";
                 case DailyRewardType.Hearts:
-                    return $"{reward.amount} Hearts\n+{EconomyBalanceConfig.DailySolverTicketBonus} Solver Tickets";
+                    return $"{reward.amount} {T("hearts")}\n+{EconomyBalanceConfig.DailySolverTicketBonus} {T("solver_tickets")}";
                 case DailyRewardType.Item:
-                    return $"{reward.amount} {reward.itemType}\n+{EconomyBalanceConfig.DailySolverTicketBonus} Solver Tickets";
+                    return $"{reward.amount} {reward.itemType}\n+{EconomyBalanceConfig.DailySolverTicketBonus} {T("solver_tickets")}";
                 default:
-                    return $"{reward.amount}\n+{EconomyBalanceConfig.DailySolverTicketBonus} Solver Tickets";
+                    return $"{reward.amount}\n+{EconomyBalanceConfig.DailySolverTicketBonus} {T("solver_tickets")}";
             }
         }
 
@@ -625,15 +626,15 @@ namespace CubeChallenge3D.UI.Rewards
             switch (reward.type)
             {
                 case DailyRewardType.Coins:
-                    return $"Coins x{reward.amount}";
+                    return $"{T("coins")} x{reward.amount}";
                 case DailyRewardType.Gems:
-                    return $"Gems x{reward.amount}";
+                    return $"{T("gems")} x{reward.amount}";
                 case DailyRewardType.Hearts:
-                    return $"Hearts x{reward.amount}";
+                    return $"{T("hearts")} x{reward.amount}";
                 case DailyRewardType.Item:
                     return $"{reward.itemType} x{reward.amount}";
                 default:
-                    return $"Reward x{reward.amount}";
+                    return $"{T("reward")} x{reward.amount}";
             }
         }
 
@@ -807,7 +808,7 @@ namespace CubeChallenge3D.UI.Rewards
 
         private static void CreateTitle(RectTransform parent)
         {
-            Text title = RuntimeUiFactory.CreateText(parent, "DailyRewardsTitle", "Daily Rewards", 76, TextAnchor.MiddleCenter);
+            Text title = RuntimeUiFactory.CreateText(parent, "DailyRewardsTitle", T("daily_rewards_title"), 76, TextAnchor.MiddleCenter);
             title.rectTransform.anchorMin = new Vector2(0.08f, 1f);
             title.rectTransform.anchorMax = new Vector2(0.92f, 1f);
             title.rectTransform.pivot = new Vector2(0.5f, 1f);
@@ -820,7 +821,7 @@ namespace CubeChallenge3D.UI.Rewards
 
         private static void CreateSubtitle(RectTransform parent)
         {
-            Text subtitle = RuntimeUiFactory.CreateText(parent, "DailyRewardsSubtitle", "Claim today's reward and get 3 Solver Tickets!", 28, TextAnchor.MiddleCenter);
+            Text subtitle = RuntimeUiFactory.CreateText(parent, "DailyRewardsSubtitle", T("daily_rewards_subtitle"), 28, TextAnchor.MiddleCenter);
             subtitle.rectTransform.anchorMin = new Vector2(0.08f, 1f);
             subtitle.rectTransform.anchorMax = new Vector2(0.92f, 1f);
             subtitle.rectTransform.pivot = new Vector2(0.5f, 1f);
@@ -889,6 +890,13 @@ namespace CubeChallenge3D.UI.Rewards
             }
 
             return card;
+        }
+
+        private static string T(string key)
+        {
+            return LocalizationManager.Instance != null
+                ? LocalizationManager.Instance.GetText(key)
+                : key;
         }
 
         private enum RewardCardState

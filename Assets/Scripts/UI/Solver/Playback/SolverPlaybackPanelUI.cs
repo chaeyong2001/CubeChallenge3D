@@ -99,15 +99,15 @@ namespace CubeChallenge3D.UI.Solver.Playback
             {
                 TitlePosition = new Vector2(0f, -24f),
                 TitleSize = new Vector2(720f, 48f),
-                CubeAreaPosition = new Vector2(0f, -88f),
-                CubeAreaSize = new Vector2(620f, 560f),
-                CurrentMoveTextPosition = new Vector2(0f, -660f),
+                CubeAreaPosition = new Vector2(0f, -86f),
+                CubeAreaSize = new Vector2(760f, 570f),
+                CurrentMoveTextPosition = new Vector2(0f, -668f),
                 CurrentMoveTextSize = new Vector2(820f, 50f),
-                MoveProgressTextPosition = new Vector2(0f, -710f),
+                MoveProgressTextPosition = new Vector2(0f, -718f),
                 MoveProgressTextSize = new Vector2(820f, 38f),
                 PlaybackButtonSize = new Vector2(360f, 76f),
-                PreviousButtonPosition = new Vector2(-205f, -795f),
-                NextButtonPosition = new Vector2(205f, -795f),
+                PreviousButtonPosition = new Vector2(-205f, -805f),
+                NextButtonPosition = new Vector2(205f, -805f),
                 AutoPlayButtonPosition = new Vector2(-205f, -888f),
                 BackButtonPosition = new Vector2(205f, -888f)
             };

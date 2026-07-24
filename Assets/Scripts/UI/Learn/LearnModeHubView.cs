@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using CubeChallenge3D.Audio;
+using CubeChallenge3D.Core;
 using CubeChallenge3D.UI.Common;
 using CubeChallenge3D.UI.Style;
 using UnityEngine;
@@ -34,6 +35,10 @@ namespace CubeChallenge3D.UI.Learn
         private Action manualSolverAction;
         private Action<string> categoryAction;
         private Action practiceAction;
+        private Text headerTitle;
+        private Text headerSubtitle;
+        private Text backButtonText;
+        private readonly List<CardBinding> cardBindings = new List<CardBinding>();
         private static readonly Dictionary<string, Sprite> IconCache = new Dictionary<string, Sprite>();
 
         public LearnModeHubView(Transform parent)
@@ -70,22 +75,23 @@ namespace CubeChallenge3D.UI.Learn
             RectTransform cardContent = CreateScrollableCardContent(panel);
             float cardHeight = CalculateCardHeight();
             float cardGap = CalculateCardGap();
-            CreateCard(cardContent, "Manual Solver", "Enter your cube and get a solution.", "manual_solver", GetScrollableCardTopY(0, cardHeight, cardGap), cardHeight, () =>
+            CreateCard(cardContent, "manual_solver", "learn_hub_manual_desc", "manual_solver", GetScrollableCardTopY(0, cardHeight, cardGap), cardHeight, () =>
             {
                 Hide();
                 manualSolverAction?.Invoke();
             });
-            CreateCard(cardContent, "Learn Basics", "Understand faces, turns, and notation.", "learn_basics", GetScrollableCardTopY(1, cardHeight, cardGap), cardHeight, () => OpenCategory("basics"));
-            CreateCard(cardContent, "Beginner Method", "Learn the 3x3 step by step.", "beginner_method", GetScrollableCardTopY(2, cardHeight, cardGap), cardHeight, () => OpenCategory("beginner"));
-            CreateCard(cardContent, "Formula Practice", "Practice common move patterns.", "formula_practice", GetScrollableCardTopY(3, cardHeight, cardGap), cardHeight, () => OpenCategory("formulas"));
-            CreateCard(cardContent, "Tutorial Playback", "Watch guided face-turn demonstrations.", "tutorial_playback", GetScrollableCardTopY(4, cardHeight, cardGap), cardHeight, () => OpenCategory("notation"));
-            CreateCard(cardContent, "Practice", "Practice freely without limits.\nNo hearts required.", "practice", GetScrollableCardTopY(5, cardHeight, cardGap), cardHeight, () =>
+            CreateCard(cardContent, "learn_basics", "learn_hub_basics_desc", "learn_basics", GetScrollableCardTopY(1, cardHeight, cardGap), cardHeight, () => OpenCategory("basics"));
+            CreateCard(cardContent, "beginner_method", "learn_hub_beginner_desc", "beginner_method", GetScrollableCardTopY(2, cardHeight, cardGap), cardHeight, () => OpenCategory("beginner"));
+            CreateCard(cardContent, "formula_practice", "learn_hub_formulas_desc", "formula_practice", GetScrollableCardTopY(3, cardHeight, cardGap), cardHeight, () => OpenCategory("formulas"));
+            CreateCard(cardContent, "tutorial_playback", "learn_hub_playback_desc", "tutorial_playback", GetScrollableCardTopY(4, cardHeight, cardGap), cardHeight, () => OpenCategory("notation"));
+            CreateCard(cardContent, "practice", "learn_hub_practice_desc", "practice", GetScrollableCardTopY(5, cardHeight, cardGap), cardHeight, () =>
             {
                 practiceAction?.Invoke();
             });
             SetScrollableContentHeight(cardContent, cardHeight, cardGap);
 
-            Button back = RuntimeUiFactory.CreateButton(panel, "BackButton", "Back", new Vector2(0f, 70f), new Vector2(360f, 70f));
+            Button back = RuntimeUiFactory.CreateButton(panel, "BackButton", T("back"), new Vector2(0f, 70f), new Vector2(360f, 70f));
+            backButtonText = back.GetComponentInChildren<Text>();
             CasualUIStyle.ApplyButton(back, CasualUIColor.Blue);
             StyleButtonText(back, 34);
             back.onClick.AddListener(Hide);
@@ -120,6 +126,7 @@ namespace CubeChallenge3D.UI.Learn
         {
             AudioFeedbackManager.ClearMenuBgmSuppressions();
             ApplyCameraFallback();
+            RefreshLocalizedText();
             root.SetActive(true);
         }
 
@@ -131,14 +138,14 @@ namespace CubeChallenge3D.UI.Learn
 
         private void CreateCard(
             RectTransform parent,
-            string title,
-            string description,
+            string titleKey,
+            string descriptionKey,
             string iconName,
             float topY,
             float cardHeight,
             Action action)
         {
-            GameObject cardObject = new GameObject(title.Replace(" ", string.Empty) + "Card", typeof(RectTransform), typeof(Image), typeof(Outline), typeof(Shadow));
+            GameObject cardObject = new GameObject(iconName + "Card", typeof(RectTransform), typeof(Image), typeof(Outline), typeof(Shadow));
             cardObject.transform.SetParent(parent, false);
             RectTransform card = cardObject.GetComponent<RectTransform>();
             card.anchorMin = new Vector2(0.065f, 1f);
@@ -160,7 +167,7 @@ namespace CubeChallenge3D.UI.Learn
 
             CreateIcon(card, iconName);
 
-            Text titleText = RuntimeUiFactory.CreateText(card, "Title", title, ScaledFont(32), TextAnchor.UpperLeft);
+            Text titleText = RuntimeUiFactory.CreateText(card, "Title", T(titleKey), ScaledFont(32), TextAnchor.UpperLeft);
             titleText.fontStyle = FontStyle.Bold;
             titleText.rectTransform.anchorMin = new Vector2(0f, 1f);
             titleText.rectTransform.anchorMax = new Vector2(1f, 1f);
@@ -169,7 +176,7 @@ namespace CubeChallenge3D.UI.Learn
             titleText.rectTransform.sizeDelta = ScaleVector(new Vector2(-410f, 44f));
             CasualUIStyle.ApplyTextDepth(titleText, true);
 
-            Text body = RuntimeUiFactory.CreateText(card, "Description", description, ScaledFont(22), TextAnchor.LowerLeft);
+            Text body = RuntimeUiFactory.CreateText(card, "Description", T(descriptionKey), ScaledFont(22), TextAnchor.LowerLeft);
             body.color = new Color(0.93f, 0.93f, 0.98f, 1f);
             body.rectTransform.anchorMin = new Vector2(0f, 1f);
             body.rectTransform.anchorMax = new Vector2(1f, 1f);
@@ -178,7 +185,8 @@ namespace CubeChallenge3D.UI.Learn
             body.rectTransform.sizeDelta = ScaleVector(new Vector2(-410f, 72f));
             CasualUIStyle.ApplyTextDepth(body, false);
 
-            Button open = RuntimeUiFactory.CreateButton(card, "OpenButton", "Open", Vector2.zero, ScaleVector(new Vector2(166f, 62f)));
+            Button open = RuntimeUiFactory.CreateButton(card, "OpenButton", T("open"), Vector2.zero, ScaleVector(new Vector2(166f, 62f)));
+            Text openText = open.GetComponentInChildren<Text>();
             CasualUIStyle.ApplyButton(open, CasualUIColor.Blue);
             RectTransform openRect = open.GetComponent<RectTransform>();
             openRect.anchorMin = new Vector2(1f, 0.5f);
@@ -190,6 +198,8 @@ namespace CubeChallenge3D.UI.Learn
             {
                 open.onClick.AddListener(() => action());
             }
+
+            cardBindings.Add(new CardBinding(titleKey, descriptionKey, titleText, body, openText));
         }
 
         private void OpenCategory(string categoryId)
@@ -272,15 +282,17 @@ namespace CubeChallenge3D.UI.Learn
             fallbackCamera = null;
         }
 
-        private static void CreateHeader(RectTransform parent)
+        private void CreateHeader(RectTransform parent)
         {
-            Text title = RuntimeUiFactory.CreateText(parent, "Title", "Solver & Learn", 62, TextAnchor.MiddleCenter);
+            Text title = RuntimeUiFactory.CreateText(parent, "Title", T("solver_learn_title"), 62, TextAnchor.MiddleCenter);
+            headerTitle = title;
             title.fontStyle = FontStyle.Bold;
             title.color = new Color(1f, 0.82f, 0.38f, 1f);
             SetTopRect(title.rectTransform, -278f, 80f, 84f);
             CasualUIStyle.ApplyTextDepth(title, true);
 
-            Text subtitle = RuntimeUiFactory.CreateText(parent, "Subtitle", "Choose a solver or learning activity.", 28, TextAnchor.MiddleCenter);
+            Text subtitle = RuntimeUiFactory.CreateText(parent, "Subtitle", T("solver_learn_subtitle"), 28, TextAnchor.MiddleCenter);
+            headerSubtitle = subtitle;
             subtitle.color = new Color(0.91f, 0.91f, 0.96f, 1f);
             SetTopRect(subtitle.rectTransform, -350f, 80f, 44f);
             CasualUIStyle.ApplyTextDepth(subtitle, false);
@@ -427,6 +439,72 @@ namespace CubeChallenge3D.UI.Learn
             rect.pivot = new Vector2(0.5f, 1f);
             rect.anchoredPosition = new Vector2(0f, y);
             rect.sizeDelta = new Vector2(-horizontalPadding * 2f, height);
+        }
+
+        private static string T(string key)
+        {
+            return LocalizationManager.Instance != null
+                ? LocalizationManager.Instance.GetText(key)
+                : key;
+        }
+
+        private void RefreshLocalizedText()
+        {
+            if (headerTitle != null)
+            {
+                headerTitle.text = T("solver_learn_title");
+            }
+
+            if (headerSubtitle != null)
+            {
+                headerSubtitle.text = T("solver_learn_subtitle");
+            }
+
+            if (backButtonText != null)
+            {
+                backButtonText.text = T("back");
+            }
+
+            foreach (CardBinding binding in cardBindings)
+            {
+                binding.Refresh();
+            }
+        }
+
+        private sealed class CardBinding
+        {
+            private readonly string titleKey;
+            private readonly string descriptionKey;
+            private readonly Text titleText;
+            private readonly Text descriptionText;
+            private readonly Text openText;
+
+            public CardBinding(string titleKey, string descriptionKey, Text titleText, Text descriptionText, Text openText)
+            {
+                this.titleKey = titleKey;
+                this.descriptionKey = descriptionKey;
+                this.titleText = titleText;
+                this.descriptionText = descriptionText;
+                this.openText = openText;
+            }
+
+            public void Refresh()
+            {
+                if (titleText != null)
+                {
+                    titleText.text = T(titleKey);
+                }
+
+                if (descriptionText != null)
+                {
+                    descriptionText.text = T(descriptionKey);
+                }
+
+                if (openText != null)
+                {
+                    openText.text = T("open");
+                }
+            }
         }
     }
 }

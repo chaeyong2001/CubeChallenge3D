@@ -83,19 +83,19 @@ namespace CubeChallenge3D.UI.Stages
             statsText.alignment = TextAnchor.UpperCenter;
             resultText = CreateRow(panel, "Result", new Vector2(0f, -358f), 21, 120f);
 
-            startButton = RuntimeUiFactory.CreateButton(panel, "StartButton", "Start", new Vector2(-205f, 90f), new Vector2(180f, 58f));
-            viewTargetButton = RuntimeUiFactory.CreateButton(panel, "ViewTargetButton", "View Target", new Vector2(215f, 90f), new Vector2(200f, 58f));
-            retryButton = RuntimeUiFactory.CreateButton(panel, "RetryButton", "Retry", new Vector2(-205f, 24f), new Vector2(180f, 58f));
-            Button listButton = RuntimeUiFactory.CreateButton(panel, "StageListButton", "Stage List", new Vector2(0f, 24f), new Vector2(200f, 58f));
-            nextButton = RuntimeUiFactory.CreateButton(panel, "NextButton", "Next Stage", new Vector2(215f, 24f), new Vector2(200f, 58f));
-            hintButton = RuntimeUiFactory.CreateButton(panel, "HintButton", "Hint", new Vector2(-205f, 90f), new Vector2(180f, 54f));
-            undoButton = RuntimeUiFactory.CreateButton(panel, "AssistUndoButton", "Undo", new Vector2(0f, 90f), new Vector2(180f, 54f));
-            continueButton = RuntimeUiFactory.CreateButton(panel, "ContinueButton", "Continue +2", new Vector2(215f, 90f), new Vector2(200f, 54f));
-            movePlus1Button = RuntimeUiFactory.CreateButton(panel, "MovePlus1Button", "+1 Move", new Vector2(-205f, 154f), new Vector2(180f, 54f));
-            movePlus2Button = RuntimeUiFactory.CreateButton(panel, "MovePlus2Button", "+2 Move", new Vector2(0f, 154f), new Vector2(180f, 54f));
-            movePlus3Button = RuntimeUiFactory.CreateButton(panel, "MovePlus3Button", "+3 Move", new Vector2(215f, 154f), new Vector2(200f, 54f));
+            startButton = RuntimeUiFactory.CreateButton(panel, "StartButton", T("start"), new Vector2(-205f, 90f), new Vector2(180f, 58f));
+            viewTargetButton = RuntimeUiFactory.CreateButton(panel, "ViewTargetButton", T("view_target"), new Vector2(215f, 90f), new Vector2(200f, 58f));
+            retryButton = RuntimeUiFactory.CreateButton(panel, "RetryButton", T("retry"), new Vector2(-205f, 24f), new Vector2(180f, 58f));
+            Button listButton = RuntimeUiFactory.CreateButton(panel, "StageListButton", T("stage_list"), new Vector2(0f, 24f), new Vector2(200f, 58f));
+            nextButton = RuntimeUiFactory.CreateButton(panel, "NextButton", T("next_stage"), new Vector2(215f, 24f), new Vector2(200f, 58f));
+            hintButton = RuntimeUiFactory.CreateButton(panel, "HintButton", T("hint"), new Vector2(-205f, 90f), new Vector2(180f, 54f));
+            undoButton = RuntimeUiFactory.CreateButton(panel, "AssistUndoButton", T("undo"), new Vector2(0f, 90f), new Vector2(180f, 54f));
+            continueButton = RuntimeUiFactory.CreateButton(panel, "ContinueButton", string.Format(T("continue_plus_moves"), 2), new Vector2(215f, 90f), new Vector2(200f, 54f));
+            movePlus1Button = RuntimeUiFactory.CreateButton(panel, "MovePlus1Button", string.Format(T("move_plus"), 1), new Vector2(-205f, 154f), new Vector2(180f, 54f));
+            movePlus2Button = RuntimeUiFactory.CreateButton(panel, "MovePlus2Button", string.Format(T("move_plus"), 2), new Vector2(0f, 154f), new Vector2(180f, 54f));
+            movePlus3Button = RuntimeUiFactory.CreateButton(panel, "MovePlus3Button", string.Format(T("move_plus"), 3), new Vector2(215f, 154f), new Vector2(200f, 54f));
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
-            forceClearButton = RuntimeUiFactory.CreateButton(panel, "ForceClearDebugButton", "Force Clear", new Vector2(205f, -52f), new Vector2(210f, 48f));
+            forceClearButton = RuntimeUiFactory.CreateButton(panel, "ForceClearDebugButton", T("force_clear"), new Vector2(205f, -52f), new Vector2(210f, 48f));
             Image forceClearImage = forceClearButton.GetComponent<Image>();
             if (forceClearImage != null)
             {
@@ -206,7 +206,7 @@ namespace CubeChallenge3D.UI.Stages
             else if (gameMode.State == StagePlayState.Failed)
             {
                 int used = gameMode.AssistState != null ? gameMode.AssistState.adContinueCount : 0;
-                resultText.text = $"Out of moves\nWatch Ad for +{gameMode.StageContinueMovesReward} Moves\n{used}/{gameMode.StageContinueMaxPerRun} used";
+                resultText.text = string.Format(T("out_of_moves_ad"), gameMode.StageContinueMovesReward, used, gameMode.StageContinueMaxPerRun);
             }
             else
             {
@@ -432,10 +432,10 @@ namespace CubeChallenge3D.UI.Stages
                 Vector2.zero,
                 new Vector2(620f, 300f));
             AddPopupDragBar(panel);
-            popupText = RuntimeUiFactory.CreateText(panel, "PopupText", "Target Pattern", 30, TextAnchor.MiddleCenter);
+            popupText = RuntimeUiFactory.CreateText(panel, "PopupText", T("target_pattern"), 30, TextAnchor.MiddleCenter);
             popupText.rectTransform.offsetMin = new Vector2(32f, 100f);
             popupText.rectTransform.offsetMax = new Vector2(-32f, -32f);
-            Button close = RuntimeUiFactory.CreateButton(panel, "CloseButton", "Close", new Vector2(0f, 28f), new Vector2(240f, 64f));
+            Button close = RuntimeUiFactory.CreateButton(panel, "CloseButton", T("close"), new Vector2(0f, 28f), new Vector2(240f, 64f));
             close.onClick.AddListener(HideTargetPopup);
             targetPopupRoot.SetActive(false);
         }
@@ -466,7 +466,7 @@ namespace CubeChallenge3D.UI.Stages
             }
 
             gameMode.SetTargetPreviewOpen(true);
-            popupText.text = "Target Pattern\nMatch this cube.";
+            popupText.text = T("target_pattern") + "\n" + T("match_this_cube");
             targetPopupRoot.SetActive(true);
             previewKey = $"{gameMode.CurrentStage?.stageId}:popup";
             previewView?.Show(gameMode.TargetState, Vector3.zero, new Vector3(24f, -35f, 0f), 1f, true);
@@ -494,6 +494,13 @@ namespace CubeChallenge3D.UI.Stages
             int minutes = Mathf.FloorToInt(seconds / 60f);
             float remaining = seconds - (minutes * 60f);
             return $"{minutes:00}:{remaining:00.00}";
+        }
+
+        private static string T(string key)
+        {
+            return LocalizationManager.Instance != null
+                ? LocalizationManager.Instance.GetText(key)
+                : key;
         }
 
         private sealed class PanelDragHandle : MonoBehaviour, IDragHandler

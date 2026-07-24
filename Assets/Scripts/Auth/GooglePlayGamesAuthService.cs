@@ -18,14 +18,16 @@ namespace CubeChallenge3D.Auth
 
         public Task<AccountLinkState> SignInAsync()
         {
+            Debug.Log("[GPGS] Manual sign-in start.");
             if (!IsAvailable())
             {
+                Debug.LogWarning("[GPGS] Manual sign-in unavailable: Google Play Games SDK is not enabled for this build.");
                 return Task.FromResult(AccountLinkState.Unavailable(
                     ProviderName,
                     "Google Play Games is not available in this build."));
             }
 
-            Debug.LogWarning("[Auth] Google Play Games SDK hook is not implemented yet.");
+            Debug.LogWarning("[GPGS] Manual sign-in failed: Google Play Games SDK hook is not implemented yet.");
             return Task.FromResult(AccountLinkState.Unavailable(
                 ProviderName,
                 "Google Play Games SDK setup is pending."));

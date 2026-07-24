@@ -3992,9 +3992,9 @@ namespace CubeChallenge3D.UI.Game
             }
 
             ShowOverlay(
-                "Star Conditions",
+                T("star_conditions_title"),
                 string.Empty,
-                "OK",
+                T("ok"),
                 HideOverlay,
                 false);
 
@@ -4027,9 +4027,21 @@ namespace CubeChallenge3D.UI.Game
             int twoStarLimit = stageData.starMoveLimit2 > 0 ? stageData.starMoveLimit2 : minMoves + 2;
             int oneStarLimit = stageData.starMoveLimit1 > 0 ? stageData.starMoveLimit1 : stageData.moveLimit;
 
-            CreateStarConditionRow(0, 3, "3 Stars", $"Within {threeStarLimit} moves\nNo help items used");
-            CreateStarConditionRow(1, 2, "2 Stars", $"Within {twoStarLimit} moves\nOr after using 1-2 help items");
-            CreateStarConditionRow(2, 1, "1 Star", $"Clear within {oneStarLimit} moves\nOr after additional help item penalties");
+            CreateStarConditionRow(
+                0,
+                3,
+                string.Format(T("star_title_count"), 3),
+                string.Format(T("star_condition_3"), threeStarLimit));
+            CreateStarConditionRow(
+                1,
+                2,
+                string.Format(T("star_title_count"), 2),
+                string.Format(T("star_condition_2"), twoStarLimit));
+            CreateStarConditionRow(
+                2,
+                1,
+                string.Format(T("star_title_one"), 1),
+                string.Format(T("star_condition_1"), oneStarLimit));
             starConditionsRoot.gameObject.SetActive(true);
         }
 
@@ -4202,6 +4214,13 @@ namespace CubeChallenge3D.UI.Game
             int minutes = Mathf.FloorToInt(seconds / 60f);
             float remaining = seconds - minutes * 60f;
             return $"{minutes:00}:{remaining:00.00}";
+        }
+
+        private static string T(string key)
+        {
+            return LocalizationManager.Instance != null
+                ? LocalizationManager.Instance.GetText(key)
+                : key;
         }
 
         private sealed class WeeklyRankingRewardsButtonAttention : MonoBehaviour

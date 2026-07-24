@@ -26,8 +26,8 @@ namespace CubeChallenge3D.Economy
         public const int LargeCoinPackGemPrice = 260;
 
         public const int SmallGemPackGems = 80;
-        public const int MediumGemPackGems = 550;
-        public const int LargeGemPackGems = 1200;
+        public const int MediumGemPackGems = 450;
+        public const int LargeGemPackGems = 800;
         public const string SmallGemPackFallbackPrice = "KRW 1,500";
         public const string MediumGemPackFallbackPrice = "KRW 5,900";
         public const string LargeGemPackFallbackPrice = "KRW 12,000";

@@ -31,6 +31,7 @@ namespace CubeChallenge3D.UI.Settings
         private SettingsStore settingsStore;
         private PlayerProfileStore profileStore;
         private PlayerProfileApiClient profileApiClient;
+        private AccountLinkApiClient accountLinkApiClient;
         private GooglePlayGamesAuthService googlePlayGames;
 
         private GameObject root;
@@ -54,6 +55,7 @@ namespace CubeChallenge3D.UI.Settings
         private Text nicknamePopupMessage;
         private GameObject avatarPopupRoot;
         private Text avatarPopupMessage;
+        private GameObject languagePopupRoot;
         private bool isSubmittingNickname;
         private bool isSubmittingAvatar;
         private readonly NicknamePopupKeyboardGuard nicknameKeyboardGuard = new NicknamePopupKeyboardGuard();
@@ -64,8 +66,12 @@ namespace CubeChallenge3D.UI.Settings
             CubeRuntimeDiagnostics runtimeDiagnostics)
         {
             settingsStore = store ?? new SettingsStore();
+            LocalizationManager.Instance?.SetLanguageFromCode(settingsStore.Current.languageCode);
             profileStore = new PlayerProfileStore();
             profileApiClient = new PlayerProfileApiClient(
+                settingsStore.Current.rankingApiBaseUrl,
+                settingsStore.Current.rankingRequestTimeoutSeconds);
+            accountLinkApiClient = new AccountLinkApiClient(
                 settingsStore.Current.rankingApiBaseUrl,
                 settingsStore.Current.rankingRequestTimeoutSeconds);
             googlePlayGames = new GooglePlayGamesAuthService();
@@ -125,7 +131,7 @@ namespace CubeChallenge3D.UI.Settings
             AddGoldOutline(panel, new Vector2(4f, -4f));
             RectTransform content = CreateScrollableSettingsContent(panel);
 
-            Text profileTitle = RuntimeUiFactory.CreateText(content, "ProfileTitle", "Profile", 34, TextAnchor.MiddleLeft);
+            Text profileTitle = RuntimeUiFactory.CreateText(content, "ProfileTitle", T("profile"), 34, TextAnchor.MiddleLeft);
             profileTitle.fontStyle = FontStyle.Bold;
             profileTitle.color = new Color(1f, 0.82f, 0.24f, 1f);
             profileTitle.rectTransform.anchorMin = new Vector2(0.055f, 0.925f);
@@ -151,7 +157,7 @@ namespace CubeChallenge3D.UI.Settings
 
         private void CreateHeader(RectTransform screen)
         {
-            Text title = RuntimeUiFactory.CreateText(screen, "SettingsTitle", "Settings", 72, TextAnchor.MiddleCenter);
+            Text title = RuntimeUiFactory.CreateText(screen, "SettingsTitle", T("settings"), 72, TextAnchor.MiddleCenter);
             title.fontStyle = FontStyle.Bold;
             title.color = new Color(1f, 0.78f, 0.18f, 1f);
             title.rectTransform.anchorMin = new Vector2(0.08f, 1f);
@@ -161,7 +167,7 @@ namespace CubeChallenge3D.UI.Settings
             title.rectTransform.sizeDelta = new Vector2(0f, 106f);
             CasualUIStyle.ApplyTextDepth(title, true);
 
-            Text subtitle = RuntimeUiFactory.CreateText(screen, "SettingsSubtitle", "Customize your experience", 28, TextAnchor.MiddleCenter);
+            Text subtitle = RuntimeUiFactory.CreateText(screen, "SettingsSubtitle", T("customize_experience"), 28, TextAnchor.MiddleCenter);
             subtitle.fontStyle = FontStyle.Bold;
             subtitle.color = new Color(1f, 0.78f, 0.25f, 1f);
             subtitle.rectTransform.anchorMin = new Vector2(0.08f, 1f);
@@ -178,7 +184,7 @@ namespace CubeChallenge3D.UI.Settings
         {
             RectTransform section = CreateRowPanel(panel, "ProfileSection", new Vector2(0.045f, 0.61f), new Vector2(0.955f, 0.91f));
             avatarImage = CreateAvatar(section);
-            avatarEditButton = RuntimeUiFactory.CreateButton(section, "AvatarEditButton", "Edit", Vector2.zero, new Vector2(116f, 42f));
+            avatarEditButton = RuntimeUiFactory.CreateButton(section, "AvatarEditButton", T("edit"), Vector2.zero, new Vector2(116f, 42f));
             Place(avatarEditButton.GetComponent<RectTransform>(), new Vector2(0.105f, 0.04f), new Vector2(0.245f, 0.19f));
             Text avatarEditLabel = avatarEditButton.GetComponentInChildren<Text>();
             if (avatarEditLabel != null)
@@ -189,7 +195,7 @@ namespace CubeChallenge3D.UI.Settings
 
             avatarEditButton.onClick.AddListener(ShowAvatarPopup);
 
-            CreateSmallLabel(section, "NicknameLabel", "Nickname", new Vector2(0.34f, 0.63f), new Vector2(0.68f, 0.85f));
+            CreateSmallLabel(section, "NicknameLabel", T("nickname"), new Vector2(0.34f, 0.63f), new Vector2(0.68f, 0.85f));
             nicknameValue = RuntimeUiFactory.CreateText(section, "NicknameValue", string.Empty, 40, TextAnchor.MiddleLeft);
             nicknameValue.fontStyle = FontStyle.Bold;
             nicknameValue.color = new Color(1f, 0.95f, 0.78f, 1f);
@@ -202,12 +208,12 @@ namespace CubeChallenge3D.UI.Settings
             nicknameValue.resizeTextMaxSize = 40;
             CasualUIStyle.ApplyTextDepth(nicknameValue, true);
 
-            Button edit = RuntimeUiFactory.CreateButton(section, "NicknameEditButton", "Edit", Vector2.zero, new Vector2(190f, 76f));
+            Button edit = RuntimeUiFactory.CreateButton(section, "NicknameEditButton", T("edit"), Vector2.zero, new Vector2(190f, 76f));
             Place(edit.GetComponent<RectTransform>(), new Vector2(0.78f, 0.58f), new Vector2(0.96f, 0.83f));
             edit.onClick.AddListener(ShowNicknamePopup);
 
             CreateDivider(section, 0.47f);
-            CreateSmallLabel(section, "GooglePlayLabel", "Google Play", new Vector2(0.34f, 0.25f), new Vector2(0.68f, 0.43f));
+            CreateSmallLabel(section, "GooglePlayLabel", T("google_play"), new Vector2(0.34f, 0.25f), new Vector2(0.68f, 0.43f));
             googlePlayValue = RuntimeUiFactory.CreateText(section, "GooglePlayValue", string.Empty, 28, TextAnchor.MiddleLeft);
             googlePlayValue.fontStyle = FontStyle.Bold;
             googlePlayValue.color = new Color(1f, 0.95f, 0.80f, 1f);
@@ -228,9 +234,9 @@ namespace CubeChallenge3D.UI.Settings
 
         private void CreateOptionRows(RectTransform panel)
         {
-            CreateToggleRow(panel, "Vibration", "Vibration", 0.49f, ToggleVibration, out vibrationValue, out vibrationIcon);
-            CreateToggleRow(panel, "Sound", "Sound", 0.38f, ToggleSound, out soundValue, out soundIcon);
-            CreateToggleRow(panel, "Push", "Push Notifications", 0.27f, TogglePush, out pushValue, out pushIcon);
+            CreateToggleRow(panel, "Vibration", T("vibration"), 0.49f, ToggleVibration, out vibrationValue, out vibrationIcon);
+            CreateToggleRow(panel, "Sound", T("sound"), 0.38f, ToggleSound, out soundValue, out soundIcon);
+            CreateToggleRow(panel, "Push", T("push_notifications"), 0.27f, TogglePush, out pushValue, out pushIcon);
             CreateLanguageRow(panel, 0.16f);
         }
 
@@ -269,7 +275,7 @@ namespace CubeChallenge3D.UI.Settings
         {
             RectTransform row = CreateRowPanel(panel, "LanguageRow", new Vector2(0.045f, y), new Vector2(0.955f, y + 0.09f));
             languageIcon = CreateSettingsIcon(row, LoadSettingsIcon("settings_language_on"));
-            Text label = RuntimeUiFactory.CreateText(row, "Label", "Language", 32, TextAnchor.MiddleLeft);
+            Text label = RuntimeUiFactory.CreateText(row, "Label", T("language"), 32, TextAnchor.MiddleLeft);
             label.fontStyle = FontStyle.Bold;
             label.color = new Color(1f, 0.93f, 0.78f, 1f);
             label.rectTransform.anchorMin = new Vector2(0.16f, 0f);
@@ -287,6 +293,9 @@ namespace CubeChallenge3D.UI.Settings
             languageValue = RuntimeUiFactory.CreateText(selector, "Value", "English", 28, TextAnchor.MiddleCenter);
             languageValue.fontStyle = FontStyle.Bold;
             CasualUIStyle.ApplyTextDepth(languageValue, true);
+            Button selectorButton = selector.gameObject.AddComponent<Button>();
+            selectorButton.targetGraphic = selector.GetComponent<Image>();
+            selectorButton.onClick.AddListener(ShowLanguagePopup);
         }
 
         private void CreateBottom(RectTransform screen)
@@ -298,7 +307,7 @@ namespace CubeChallenge3D.UI.Settings
             messageText.rectTransform.offsetMin = Vector2.zero;
             messageText.rectTransform.offsetMax = Vector2.zero;
 
-            Button back = RuntimeUiFactory.CreateButton(screen, "BackButton", "Back", Vector2.zero, new Vector2(440f, 82f));
+            Button back = RuntimeUiFactory.CreateButton(screen, "BackButton", T("back"), Vector2.zero, new Vector2(440f, 82f));
             RectTransform backRect = back.GetComponent<RectTransform>();
             backRect.anchorMin = new Vector2(0.5f, 0f);
             backRect.anchorMax = new Vector2(0.5f, 0f);
@@ -333,7 +342,7 @@ namespace CubeChallenge3D.UI.Settings
             panelImage.color = new Color(0.025f, 0.10f, 0.25f, 0.98f);
             AddGoldOutline(panel, new Vector2(4f, -4f));
 
-            Text title = RuntimeUiFactory.CreateText(panel, "Title", "Change Nickname", 38, TextAnchor.MiddleCenter);
+            Text title = RuntimeUiFactory.CreateText(panel, "Title", T("change_nickname"), 38, TextAnchor.MiddleCenter);
             title.fontStyle = FontStyle.Bold;
             title.color = new Color(1f, 0.82f, 0.30f, 1f);
             title.rectTransform.anchorMin = new Vector2(0.12f, 0.82f);
@@ -350,7 +359,7 @@ namespace CubeChallenge3D.UI.Settings
             Text info = RuntimeUiFactory.CreateText(
                 panel,
                 "Info",
-                "Uses 1 Nickname Change Ticket\nNickname can only be changed once per day.",
+                T("nickname_ticket_info"),
                 24,
                 TextAnchor.MiddleCenter);
             info.color = new Color(0.88f, 0.92f, 1f, 1f);
@@ -366,12 +375,12 @@ namespace CubeChallenge3D.UI.Settings
             nicknamePopupMessage.rectTransform.offsetMin = Vector2.zero;
             nicknamePopupMessage.rectTransform.offsetMax = Vector2.zero;
 
-            Button cancel = RuntimeUiFactory.CreateButton(panel, "CancelButton", "Cancel", Vector2.zero, new Vector2(250f, 78f));
+            Button cancel = RuntimeUiFactory.CreateButton(panel, "CancelButton", T("cancel"), Vector2.zero, new Vector2(250f, 78f));
             Place(cancel.GetComponent<RectTransform>(), new Vector2(0.10f, 0.06f), new Vector2(0.46f, 0.21f));
             ApplyCancelButtonStyle(cancel);
             cancel.onClick.AddListener(HideNicknamePopup);
 
-            nicknameOkButton = RuntimeUiFactory.CreateButton(panel, "OkButton", "OK", Vector2.zero, new Vector2(250f, 78f));
+            nicknameOkButton = RuntimeUiFactory.CreateButton(panel, "OkButton", T("ok"), Vector2.zero, new Vector2(250f, 78f));
             Place(nicknameOkButton.GetComponent<RectTransform>(), new Vector2(0.54f, 0.06f), new Vector2(0.90f, 0.21f));
             nicknameOkButton.onClick.AddListener(SubmitNicknameChange);
             nicknameKeyboardGuard.Configure(panel, nicknameInput);
@@ -396,7 +405,7 @@ namespace CubeChallenge3D.UI.Settings
             panelImage.color = new Color(0.025f, 0.10f, 0.25f, 0.98f);
             AddGoldOutline(panel, new Vector2(4f, -4f));
 
-            Text title = RuntimeUiFactory.CreateText(panel, "Title", "Choose Avatar", 40, TextAnchor.MiddleCenter);
+            Text title = RuntimeUiFactory.CreateText(panel, "Title", T("choose_avatar"), 40, TextAnchor.MiddleCenter);
             title.fontStyle = FontStyle.Bold;
             title.color = new Color(1f, 0.82f, 0.30f, 1f);
             title.rectTransform.anchorMin = new Vector2(0.12f, 0.84f);
@@ -561,7 +570,7 @@ namespace CubeChallenge3D.UI.Settings
             text.color = Color.white;
             input.textComponent = text;
 
-            Text placeholder = RuntimeUiFactory.CreateText(inputRoot, "Placeholder", "Nickname", 30, TextAnchor.MiddleLeft);
+            Text placeholder = RuntimeUiFactory.CreateText(inputRoot, "Placeholder", T("nickname_placeholder"), 30, TextAnchor.MiddleLeft);
             placeholder.rectTransform.offsetMin = new Vector2(26f, 0f);
             placeholder.rectTransform.offsetMax = new Vector2(-46f, 0f);
             placeholder.color = new Color(0.72f, 0.78f, 0.90f, 0.70f);
@@ -634,6 +643,7 @@ namespace CubeChallenge3D.UI.Settings
             }
 
             settingsStore.Load();
+            LocalizationManager.Instance?.SetLanguageFromCode(settingsStore.Current.languageCode);
             profileStore.ReloadFromDisk();
             PlayerProfile profile = profileStore.Current;
             nicknameValue.text = profile != null ? profile.nickname : "Player";
@@ -642,14 +652,14 @@ namespace CubeChallenge3D.UI.Settings
 
             bool linkedGooglePlay = profile != null && profile.linkedGooglePlay;
             googlePlayValue.text = linkedGooglePlay
-                ? FirstNonEmpty(profile.googlePlayPlayerId, "Connected")
-                : "Not connected";
-            googlePlayButtonLabel.text = linkedGooglePlay ? "Connected" : "Connect";
+                ? FirstNonEmpty(profile.googlePlayPlayerId, T("connected"))
+                : T("not_connected");
+            googlePlayButtonLabel.text = linkedGooglePlay ? T("connected") : T("connect");
 
-            vibrationValue.text = settingsStore.Current.vibrationEnabled ? "ON" : "OFF";
-            soundValue.text = settingsStore.Current.soundEnabled ? "ON" : "OFF";
-            pushValue.text = settingsStore.Current.pushNotificationsEnabled ? "ON" : "OFF";
-            languageValue.text = settingsStore.Current.languageCode == "ko" ? "Korean" : "English";
+            vibrationValue.text = settingsStore.Current.vibrationEnabled ? T("on") : T("off");
+            soundValue.text = settingsStore.Current.soundEnabled ? T("on") : T("off");
+            pushValue.text = settingsStore.Current.pushNotificationsEnabled ? T("on") : T("off");
+            languageValue.text = GetLanguageDisplayName(settingsStore.Current.languageCode);
             SetSettingIcon(vibrationIcon, "settings_vibration_on", "settings_vibration_off", settingsStore.Current.vibrationEnabled);
             SetSettingIcon(soundIcon, "settings_sound_on", "settings_sound_off", settingsStore.Current.soundEnabled);
             SetSettingIcon(pushIcon, "settings_push_on", "settings_push_off", settingsStore.Current.pushNotificationsEnabled);
@@ -704,25 +714,62 @@ namespace CubeChallenge3D.UI.Settings
 
         private async void ConnectGooglePlay()
         {
+            Debug.Log("[GPGS] Manual connect clicked.");
             PlayerProfile profile = profileStore.Current;
             if (profile == null)
             {
-                SetMessage("Create a profile first.");
+                Debug.LogWarning("[Profile] Link guest profile to google failed: no local profile.");
+                SetMessage(T("create_profile_first"));
                 return;
             }
 
+            Debug.Log("[GPGS] Manual sign-in request.");
             AccountLinkState result = await googlePlayGames.SignInAsync();
             if (!result.success)
             {
-                profileStore.UpdateGooglePlayLink(string.Empty, string.IsNullOrWhiteSpace(result.message) ? "Google Play sign-in failed. Please try again." : result.message);
-                SetMessage("Google Play sign-in failed. Please try again.");
+                Debug.LogWarning($"[GPGS] Manual sign-in failed: message={result.message}");
+                profileStore.UpdateGooglePlayLink(string.Empty, string.IsNullOrWhiteSpace(result.message) ? T("google_play_failed") : result.message);
+                SetMessage(T("google_play_failed"));
                 RefreshLabels();
                 return;
             }
 
+            Debug.Log($"[GPGS] Manual sign-in success: playerId={MaskId(result.providerUserId)}");
+            Debug.Log($"[Profile] Link guest profile to google start: profileId={profile.profileId} googlePlayPlayerId={MaskId(result.providerUserId)}");
+            AccountLinkResult linkResult = accountLinkApiClient != null
+                ? await accountLinkApiClient.LinkGooglePlayAsync(profile.profileId, result.providerUserId, result.displayName)
+                : AccountLinkResult.Unavailable("Account link API is not initialized.");
+
+            if (!linkResult.success)
+            {
+                string message = string.IsNullOrWhiteSpace(linkResult.message) ? T("google_play_failed") : linkResult.message;
+                Debug.LogWarning($"[Profile] Link guest profile to google failed: status={linkResult.statusCode} message={message}");
+                profileStore.UpdateGooglePlayLink(string.Empty, message);
+                SetMessage(message);
+                RefreshLabels();
+                return;
+            }
+
+            Debug.Log("[Profile] Link guest profile to google success.");
             profileStore.UpdateGooglePlayLink(result.providerUserId, string.Empty);
-            SetMessage("Google Play connected.");
+            SetMessage(T("google_play_connected"));
             RefreshLabels();
+        }
+
+        private static string MaskId(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return "(empty)";
+            }
+
+            string trimmed = value.Trim();
+            if (trimmed.Length <= 8)
+            {
+                return "***";
+            }
+
+            return $"{trimmed.Substring(0, 4)}...{trimmed.Substring(trimmed.Length - 4)}";
         }
 
         private void ShowNicknamePopup()
@@ -731,8 +778,8 @@ namespace CubeChallenge3D.UI.Settings
             nicknameInput.text = profile != null ? profile.nickname : string.Empty;
             int tickets = profile != null ? Mathf.Max(0, profile.nicknameChangeTickets) : 0;
             nicknamePopupMessage.text = profile != null
-                ? $"Tickets available: {tickets}"
-                : "Create a profile first.";
+                ? string.Format(T("tickets_available"), tickets)
+                : T("create_profile_first");
             SetNicknameOkInteractable(profile != null && tickets > 0);
             nicknameKeyboardGuard.ResetToCurrentText();
             nicknamePopupRoot.SetActive(true);
@@ -751,11 +798,11 @@ namespace CubeChallenge3D.UI.Settings
         {
             if (profileStore.Current == null)
             {
-                SetMessage("Create a profile first.");
+                SetMessage(T("create_profile_first"));
                 return;
             }
 
-            avatarPopupMessage.text = "Avatar can be changed anytime.";
+            avatarPopupMessage.text = T("avatar_anytime");
             avatarPopupRoot.SetActive(true);
         }
 
@@ -763,6 +810,99 @@ namespace CubeChallenge3D.UI.Settings
         {
             avatarPopupRoot.SetActive(false);
             isSubmittingAvatar = false;
+        }
+
+        private void ShowLanguagePopup()
+        {
+            EnsureLanguagePopup();
+            languagePopupRoot.SetActive(true);
+        }
+
+        private void HideLanguagePopup()
+        {
+            if (languagePopupRoot != null)
+            {
+                languagePopupRoot.SetActive(false);
+            }
+        }
+
+        private void EnsureLanguagePopup()
+        {
+            if (languagePopupRoot != null)
+            {
+                return;
+            }
+
+            Canvas canvas = RuntimeUiFactory.CreateCanvas(root.transform, "LanguagePopupCanvas", 1590, 0f);
+            languagePopupRoot = canvas.gameObject;
+            Image blocker = languagePopupRoot.AddComponent<Image>();
+            blocker.color = new Color(0f, 0f, 0f, 0.45f);
+
+            RectTransform panel = RuntimeUiFactory.CreatePanel(
+                languagePopupRoot.transform,
+                "Panel",
+                new Vector2(0.5f, 0.5f),
+                new Vector2(0.5f, 0.5f),
+                new Vector2(0f, -80f),
+                new Vector2(680f, 420f));
+            Image panelImage = panel.GetComponent<Image>();
+            panelImage.color = new Color(0.025f, 0.10f, 0.25f, 0.98f);
+            AddGoldOutline(panel, new Vector2(4f, -4f));
+
+            Text title = RuntimeUiFactory.CreateText(panel, "Title", T("choose_language"), 40, TextAnchor.MiddleCenter);
+            title.fontStyle = FontStyle.Bold;
+            title.color = new Color(1f, 0.82f, 0.30f, 1f);
+            title.rectTransform.anchorMin = new Vector2(0.10f, 0.76f);
+            title.rectTransform.anchorMax = new Vector2(0.90f, 0.94f);
+            title.rectTransform.offsetMin = Vector2.zero;
+            title.rectTransform.offsetMax = Vector2.zero;
+            CasualUIStyle.ApplyTextDepth(title, true);
+
+            Button english = RuntimeUiFactory.CreateButton(panel, "EnglishButton", "English", Vector2.zero, new Vector2(500f, 78f));
+            Place(english.GetComponent<RectTransform>(), new Vector2(0.13f, 0.49f), new Vector2(0.87f, 0.68f));
+            english.onClick.AddListener(() => SelectLanguage(AppLanguage.English));
+
+            Button korea = RuntimeUiFactory.CreateButton(panel, "KoreaButton", "Korea", Vector2.zero, new Vector2(500f, 78f));
+            Place(korea.GetComponent<RectTransform>(), new Vector2(0.13f, 0.28f), new Vector2(0.87f, 0.47f));
+            korea.onClick.AddListener(() => SelectLanguage(AppLanguage.Korean));
+
+            Button cancel = RuntimeUiFactory.CreateButton(panel, "CancelButton", T("cancel"), Vector2.zero, new Vector2(300f, 72f));
+            Place(cancel.GetComponent<RectTransform>(), new Vector2(0.28f, 0.07f), new Vector2(0.72f, 0.24f));
+            ApplyCancelButtonStyle(cancel);
+            cancel.onClick.AddListener(HideLanguagePopup);
+            languagePopupRoot.SetActive(false);
+        }
+
+        private void SelectLanguage(AppLanguage language)
+        {
+            if (settingsStore?.Current == null)
+            {
+                return;
+            }
+
+            settingsStore.Current.languageCode = LocalizationManager.ToLanguageCode(language);
+            settingsStore.Save();
+            LocalizationManager.Instance?.SetLanguage(language);
+            HideLanguagePopup();
+            RebuildUi();
+            SetMessage(T("language_changed"));
+        }
+
+        private void RebuildUi()
+        {
+            bool showAfterRebuild = root != null && root.activeSelf;
+            if (root != null)
+            {
+                Destroy(root);
+                root = null;
+            }
+
+            nicknamePopupRoot = null;
+            avatarPopupRoot = null;
+            languagePopupRoot = null;
+            BuildUi();
+            RefreshLabels();
+            root.SetActive(showAfterRebuild);
         }
 
         private async void SelectAvatar(int avatarId)
@@ -775,7 +915,7 @@ namespace CubeChallenge3D.UI.Settings
             PlayerProfile profile = profileStore.Current;
             if (profile == null)
             {
-                avatarPopupMessage.text = "Create a profile first.";
+                avatarPopupMessage.text = T("create_profile_first");
                 return;
             }
 
@@ -786,19 +926,19 @@ namespace CubeChallenge3D.UI.Settings
             UpdateLocalRankingAvatars(profile.profileId, profile.nickname, normalizedAvatarId);
             RefreshLabels();
 
-            string message = "Avatar changed.";
+            string message = T("avatar_changed");
             if (profileApiClient.HasServerUrl && !string.IsNullOrWhiteSpace(profile.profileId))
             {
                 PlayerProfileCreateResult result = await profileApiClient.UpdateAvatarAsync(profile.profileId, normalizedAvatarId);
                 if (result.requestSucceeded && result.success)
                 {
                     profileStore.MarkServerSyncResult(true, string.Empty);
-                    message = "Avatar changed and synced.";
+                    message = T("avatar_changed_synced");
                 }
                 else
                 {
                     profileStore.MarkServerSyncResult(false, result.message);
-                    message = "Avatar changed locally. Server sync pending.";
+                    message = T("avatar_changed_local");
                 }
             }
 
@@ -820,8 +960,8 @@ namespace CubeChallenge3D.UI.Settings
             if (currentProfile == null || currentProfile.nicknameChangeTickets <= 0)
             {
                 nicknamePopupMessage.text = currentProfile == null
-                    ? "Create a profile first."
-                    : "You need a Nickname Change Ticket.";
+                    ? T("create_profile_first")
+                    : T("need_nickname_ticket");
                 SetNicknameOkInteractable(false);
                 return;
             }
@@ -900,6 +1040,23 @@ namespace CubeChallenge3D.UI.Settings
             {
                 messageText.text = message ?? string.Empty;
             }
+        }
+
+        private static string T(string key)
+        {
+            return LocalizationManager.Instance != null
+                ? LocalizationManager.Instance.GetText(key)
+                : key;
+        }
+
+        private static string GetLanguageDisplayName(string languageCode)
+        {
+            AppLanguage language = string.Equals(languageCode, "ko", StringComparison.OrdinalIgnoreCase)
+                ? AppLanguage.Korean
+                : AppLanguage.English;
+            return LocalizationManager.Instance != null
+                ? LocalizationManager.Instance.GetLanguageDisplayName(language)
+                : language == AppLanguage.Korean ? "Korea" : "English";
         }
 
         private static string FirstNonEmpty(string value, string fallback)

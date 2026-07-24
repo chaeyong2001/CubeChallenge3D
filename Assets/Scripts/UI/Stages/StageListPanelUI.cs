@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
@@ -337,7 +337,7 @@ namespace CubeChallenge3D.UI.Stages
                 artBackground.SetAsFirstSibling();
             }
 
-            mapTitle = CreateTitle(mapRoot, "Normal Mode", "Clear stages and earn stars.", -260f, 96f);
+            mapTitle = CreateTitle(mapRoot, T("normal_mode"), T("normal_mode_desc"), -260f, 96f);
             stageMapTitleGroup = mapTitle.transform.parent as RectTransform;
             mapSubtitle = mapTitle.transform.parent.Find("Subtitle")?.GetComponent<Text>();
 
@@ -445,7 +445,7 @@ namespace CubeChallenge3D.UI.Stages
             if (displayMode == StageMapDisplayMode.BlockBrowse)
             {
                 selectedBlockIndex = Mathf.Clamp(selectedBlockIndex, 0, Mathf.Max(0, (total - 1) / StagesPerBlock));
-                mapBlockChipText.text = $"Block {selectedBlockIndex + 1}";
+                mapBlockChipText.text = string.Format(T("block_label"), selectedBlockIndex + 1);
                 RefreshBlockChipVisual();
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
                 LogStageMapLayoutDebug(currentLocal, total);
@@ -458,7 +458,7 @@ namespace CubeChallenge3D.UI.Stages
             selectedBlockIndex = currentLocal > 0
                 ? Mathf.Clamp((currentLocal - 1) / StagesPerBlock, 0, Mathf.Max(0, (total - 1) / StagesPerBlock))
                 : 0;
-            mapBlockChipText.text = $"Block {selectedBlockIndex + 1}";
+            mapBlockChipText.text = string.Format(T("block_label"), selectedBlockIndex + 1);
             RefreshBlockChipVisual();
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
             LogStageMapLayoutDebug(currentLocal, total);
@@ -537,7 +537,7 @@ namespace CubeChallenge3D.UI.Stages
             int total = modeStages.Count;
             int safeFromStage = Mathf.Clamp(fromStage, 1, Mathf.Max(1, total));
             selectedBlockIndex = Mathf.Clamp((safeFromStage - 1) / StagesPerBlock, 0, Mathf.Max(0, (total - 1) / StagesPerBlock));
-            mapBlockChipText.text = $"Block {selectedBlockIndex + 1}";
+            mapBlockChipText.text = string.Format(T("block_label"), selectedBlockIndex + 1);
             suppressAutoMarkerPlacementDuringTransition = true;
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
             Debug.Log($"[StageNextTransition] ShowStageList visibleBlock={selectedBlockIndex + 1} fromStage={fromStage} toStage={toStage}");
@@ -2316,7 +2316,7 @@ namespace CubeChallenge3D.UI.Stages
             int total = modeStages.Count;
             int safeToStage = Mathf.Clamp(toStage, 1, Mathf.Max(1, total));
             selectedBlockIndex = Mathf.Clamp((safeToStage - 1) / StagesPerBlock, 0, Mathf.Max(0, (total - 1) / StagesPerBlock));
-            mapBlockChipText.text = $"Block {selectedBlockIndex + 1}";
+            mapBlockChipText.text = string.Format(T("block_label"), selectedBlockIndex + 1);
             RefreshBlockChipVisual();
             BuildMapNodes(modeStages, safeToStage, Mathf.Max(0, safeToStage - 1));
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
@@ -2564,20 +2564,20 @@ namespace CubeChallenge3D.UI.Stages
             switch (selectedType)
             {
                 case StageType.TutorialStage:
-                    mapTitle.text = "Tutorial Mode";
-                    mapSubtitle.text = "Clear beginner stages and earn stars.";
+                    mapTitle.text = T("tutorial_mode");
+                    mapSubtitle.text = T("tutorial_mode_desc");
                     break;
                 case StageType.ReverseTargetStage:
-                    mapTitle.text = "Hard Mode";
-                    mapSubtitle.text = "Match target stages and earn stars.";
+                    mapTitle.text = T("hard_mode");
+                    mapSubtitle.text = T("hard_mode_desc");
                     break;
                 case StageType.InfinityStage:
-                    mapTitle.text = "Infinity Mode";
-                    mapSubtitle.text = "Mixed stages with endless-style progression.";
+                    mapTitle.text = T("infinity_mode");
+                    mapSubtitle.text = T("infinity_mode_desc");
                     break;
                 default:
-                    mapTitle.text = "Normal Mode";
-                    mapSubtitle.text = "Clear stages and earn stars.";
+                    mapTitle.text = T("normal_mode");
+                    mapSubtitle.text = T("normal_mode_desc");
                     break;
             }
         }
@@ -2609,14 +2609,14 @@ namespace CubeChallenge3D.UI.Stages
             CasualUIStyle.ApplyPanel(blockSelectorPopup.GetComponent<Image>(), new Color(0.028f, 0.044f, 0.11f, 0.99f), 30);
             AddOutline(blockSelectorPopup, Gold, 3f);
 
-            Text title = RuntimeUiFactory.CreateText(panel, "Title", "Select Block", 42, TextAnchor.UpperCenter);
+            Text title = RuntimeUiFactory.CreateText(panel, "Title", T("select_block"), 42, TextAnchor.UpperCenter);
             title.rectTransform.offsetMin = new Vector2(40f, 802f);
             title.rectTransform.offsetMax = new Vector2(-40f, -28f);
             title.fontStyle = FontStyle.Bold;
             title.color = Cream;
             CasualUIStyle.ApplyTextDepth(title, true);
 
-            Text subtitle = RuntimeUiFactory.CreateText(panel, "Subtitle", "Choose a block to inspect.", 24, TextAnchor.UpperCenter);
+            Text subtitle = RuntimeUiFactory.CreateText(panel, "Subtitle", T("choose_block"), 24, TextAnchor.UpperCenter);
             subtitle.rectTransform.offsetMin = new Vector2(42f, 754f);
             subtitle.rectTransform.offsetMax = new Vector2(-42f, -92f);
             subtitle.color = new Color(0.82f, 0.86f, 1f, 1f);
@@ -2731,7 +2731,7 @@ namespace CubeChallenge3D.UI.Stages
             AddOutline(blockRewardsPopup, ShopCardOutline, 2f);
             AddShadow(blockRewardsPopup, 0.55f, new Vector2(0f, -12f));
 
-            Text title = RuntimeUiFactory.CreateText(panel, "Title", "Block Rewards", 68, TextAnchor.MiddleCenter);
+            Text title = RuntimeUiFactory.CreateText(panel, "Title", T("block_rewards"), 68, TextAnchor.MiddleCenter);
             title.rectTransform.anchorMin = new Vector2(0f, 1f);
             title.rectTransform.anchorMax = new Vector2(1f, 1f);
             title.rectTransform.pivot = new Vector2(0.5f, 1f);
@@ -2778,7 +2778,7 @@ namespace CubeChallenge3D.UI.Stages
             scrollRect.movementType = ScrollRect.MovementType.Clamped;
             scrollRect.scrollSensitivity = 46f;
 
-            Text footer = RuntimeUiFactory.CreateText(panel, "Footer", "Complete stages to earn stars and get amazing rewards!", 28, TextAnchor.MiddleCenter);
+            Text footer = RuntimeUiFactory.CreateText(panel, "Footer", T("complete_stages_rewards"), 28, TextAnchor.MiddleCenter);
             footer.rectTransform.anchorMin = new Vector2(0f, 0f);
             footer.rectTransform.anchorMax = new Vector2(1f, 0f);
             footer.rectTransform.pivot = new Vector2(0.5f, 0f);
@@ -2881,7 +2881,7 @@ namespace CubeChallenge3D.UI.Stages
             RectTransform rewardDivider = CreatePanel(card, "RewardDivider", new Color(1f, 1f, 1f, 0.12f), 2, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(565f, 0f), new Vector2(2f, 146f));
             rewardDivider.GetComponent<Image>().raycastTarget = false;
 
-            Text blockName = RuntimeUiFactory.CreateText(leftArea, "BlockName", $"Block\n{data.blockNumber}", 38, TextAnchor.MiddleCenter);
+            Text blockName = RuntimeUiFactory.CreateText(leftArea, "BlockName", string.Format(T("block_multiline"), data.blockNumber), 38, TextAnchor.MiddleCenter);
             blockName.rectTransform.anchorMin = Vector2.zero;
             blockName.rectTransform.anchorMax = Vector2.one;
             blockName.rectTransform.pivot = new Vector2(0.5f, 0.5f);
@@ -2892,7 +2892,7 @@ namespace CubeChallenge3D.UI.Stages
             blockName.color = data.state == BlockRewardVisualState.Locked ? new Color(0.75f, 0.78f, 0.86f, 1f) : Color.white;
             CasualUIStyle.ApplyTextDepth(blockName, true);
 
-            Text stageRange = RuntimeUiFactory.CreateText(card, "StageRange", $"Stages {data.startStage} - {data.endStage}", 29, TextAnchor.MiddleLeft);
+            Text stageRange = RuntimeUiFactory.CreateText(card, "StageRange", string.Format(T("stages_range"), data.startStage, data.endStage), 29, TextAnchor.MiddleLeft);
             stageRange.rectTransform.anchorMin = new Vector2(0f, 0.5f);
             stageRange.rectTransform.anchorMax = new Vector2(0f, 0.5f);
             stageRange.rectTransform.pivot = new Vector2(0f, 0.5f);
@@ -2934,7 +2934,7 @@ namespace CubeChallenge3D.UI.Stages
             }
             else
             {
-                Text lockedRange = RuntimeUiFactory.CreateText(card, "LockedRange", "Locked", 28, TextAnchor.MiddleLeft);
+                Text lockedRange = RuntimeUiFactory.CreateText(card, "LockedRange", T("locked_label"), 28, TextAnchor.MiddleLeft);
                 lockedRange.rectTransform.anchorMin = new Vector2(0f, 0.5f);
                 lockedRange.rectTransform.anchorMax = new Vector2(0f, 0.5f);
                 lockedRange.rectTransform.pivot = new Vector2(0f, 0.5f);
@@ -3741,6 +3741,13 @@ namespace CubeChallenge3D.UI.Stages
 
                 scrollAction?.Invoke(eventData.scrollDelta.y < 0f ? 1f : -1f);
             }
+        }
+
+        private static string T(string key)
+        {
+            return LocalizationManager.Instance != null
+                ? LocalizationManager.Instance.GetText(key)
+                : key;
         }
 
         private sealed class StageMapAnimationRunner : MonoBehaviour

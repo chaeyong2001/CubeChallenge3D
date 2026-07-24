@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Text;
 using CubeChallenge3D.Audio;
+using CubeChallenge3D.Core;
 using CubeChallenge3D.Cube.Model;
 using CubeChallenge3D.Inventory;
 using CubeChallenge3D.Solver;
@@ -237,18 +238,18 @@ namespace CubeChallenge3D.UI.Solver
                 panelImage.raycastTarget = false;
             }
 
-            titleText = RuntimeUiFactory.CreateText(panel, "Title", "Manual Solver", 58, TextAnchor.MiddleCenter);
+            titleText = RuntimeUiFactory.CreateText(panel, "Title", T("manual_solver"), 58, TextAnchor.MiddleCenter);
             titleText.fontStyle = FontStyle.Bold;
             titleText.color = new Color(1f, 0.78f, 0.22f, 1f);
             titleRect = titleText.rectTransform;
             ApplyTextDepth(titleText, new Color(0f, 0f, 0f, 0.58f), new Vector2(0f, -3f));
 
-            Text subtitleText = RuntimeUiFactory.CreateText(panel, "Subtitle", "Select a color, then enter the stickers.", 28, TextAnchor.MiddleCenter);
+            Text subtitleText = RuntimeUiFactory.CreateText(panel, "Subtitle", T("solver_instruction"), 28, TextAnchor.MiddleCenter);
             subtitleText.color = new Color(0.92f, 0.92f, 0.96f, 1f);
             subtitleRect = subtitleText.rectTransform;
 
-            Button manualButton = RuntimeUiFactory.CreateButton(panel, "ManualSolverButton", "Manual Solver", Vector2.zero, Vector2.zero);
-            Button learnButton = RuntimeUiFactory.CreateButton(panel, "LearnBasicsButton", "Learn Basics", Vector2.zero, Vector2.zero);
+            Button manualButton = RuntimeUiFactory.CreateButton(panel, "ManualSolverButton", T("manual_solver"), Vector2.zero, Vector2.zero);
+            Button learnButton = RuntimeUiFactory.CreateButton(panel, "LearnBasicsButton", T("learn_basics"), Vector2.zero, Vector2.zero);
             manualButton.gameObject.SetActive(false);
             learnButton.gameObject.SetActive(false);
             Button backButton = RuntimeUiFactory.CreateButton(panel, "BackButton", "<", Vector2.zero, layout.BackButtonSize);
@@ -291,7 +292,7 @@ namespace CubeChallenge3D.UI.Solver
             currentFaceText.color = new Color(1f, 0.84f, 0.22f, 1f);
             faceLabelRect = currentFaceText.rectTransform;
 
-            instructionText = RuntimeUiFactory.CreateText(manualInputRoot, "InputInstruction", "Select a color, then enter the stickers.", 24, TextAnchor.MiddleCenter);
+            instructionText = RuntimeUiFactory.CreateText(manualInputRoot, "InputInstruction", T("solver_instruction"), 24, TextAnchor.MiddleCenter);
             instructionText.color = new Color(0.92f, 0.92f, 0.96f, 1f);
             helperTextRect = instructionText.rectTransform;
 
@@ -313,8 +314,8 @@ namespace CubeChallenge3D.UI.Solver
             paletteRoot = CreatePaletteRoot(manualInputRoot);
             CreatePaletteButtons();
 
-            Button previousButton = RuntimeUiFactory.CreateButton(manualInputRoot, "PreviousFaceButton", "Previous", Vector2.zero, layout.FaceButtonSize);
-            Button nextButton = RuntimeUiFactory.CreateButton(manualInputRoot, "NextFaceButton", "Next", Vector2.zero, layout.FaceButtonSize);
+            Button previousButton = RuntimeUiFactory.CreateButton(manualInputRoot, "PreviousFaceButton", T("previous"), Vector2.zero, layout.FaceButtonSize);
+            Button nextButton = RuntimeUiFactory.CreateButton(manualInputRoot, "NextFaceButton", T("next"), Vector2.zero, layout.FaceButtonSize);
             previousButtonRect = previousButton.GetComponent<RectTransform>();
             nextButtonRect = nextButton.GetComponent<RectTransform>();
             previousButton.onClick.AddListener(PreviousFace);
@@ -338,21 +339,21 @@ namespace CubeChallenge3D.UI.Solver
             }
             AddOutline(resultBar.gameObject, new Color(1f, 0.65f, 0.13f, 0.9f), new Vector2(1.5f, -1.5f));
 
-            resultText = RuntimeUiFactory.CreateText(resultBar, "SolverResult", "Result: Not solved yet.", 24, TextAnchor.MiddleCenter);
+            resultText = RuntimeUiFactory.CreateText(resultBar, "SolverResult", T("solver_result_not_solved"), 24, TextAnchor.MiddleCenter);
             resultText.fontStyle = FontStyle.Bold;
             resultText.horizontalOverflow = HorizontalWrapMode.Wrap;
             resultText.verticalOverflow = VerticalWrapMode.Truncate;
             ApplyTextDepth(resultText, new Color(0f, 0f, 0f, 0.56f), new Vector2(1.5f, -1.5f));
 
-            validateButton = RuntimeUiFactory.CreateButton(manualInputRoot, "ValidateButton", "Validate", Vector2.zero, layout.ActionButtonSize);
-            Button resetButton = RuntimeUiFactory.CreateButton(manualInputRoot, "ResetSolvedButton", "Reset Solved", Vector2.zero, Vector2.zero);
-            Button clearButton = RuntimeUiFactory.CreateButton(manualInputRoot, "ClearButton", "Clear", Vector2.zero, layout.ActionButtonSize);
-            Button saveButton = RuntimeUiFactory.CreateButton(manualInputRoot, "SaveButton", "Save", Vector2.zero, Vector2.zero);
-            Button loadButton = RuntimeUiFactory.CreateButton(manualInputRoot, "LoadButton", "Load", Vector2.zero, Vector2.zero);
-            solveButton = RuntimeUiFactory.CreateButton(manualInputRoot, "SolveButton", "Solve", Vector2.zero, layout.ActionButtonSize);
-            play3DButton = RuntimeUiFactory.CreateButton(manualInputRoot, "Play3DButton", "Play 3D", Vector2.zero, layout.ActionButtonSize);
-            Button solverBackButton = RuntimeUiFactory.CreateButton(manualInputRoot, "ManualSolverBackButton", "Back", Vector2.zero, layout.ActionButtonSize);
-            Button debugButton = RuntimeUiFactory.CreateButton(manualInputRoot, "SolverDebugButton", "Debug", Vector2.zero, Vector2.zero);
+            validateButton = RuntimeUiFactory.CreateButton(manualInputRoot, "ValidateButton", T("validate"), Vector2.zero, layout.ActionButtonSize);
+            Button resetButton = RuntimeUiFactory.CreateButton(manualInputRoot, "ResetSolvedButton", T("reset_solved"), Vector2.zero, Vector2.zero);
+            Button clearButton = RuntimeUiFactory.CreateButton(manualInputRoot, "ClearButton", T("clear"), Vector2.zero, layout.ActionButtonSize);
+            Button saveButton = RuntimeUiFactory.CreateButton(manualInputRoot, "SaveButton", T("save"), Vector2.zero, Vector2.zero);
+            Button loadButton = RuntimeUiFactory.CreateButton(manualInputRoot, "LoadButton", T("load"), Vector2.zero, Vector2.zero);
+            solveButton = RuntimeUiFactory.CreateButton(manualInputRoot, "SolveButton", T("solve"), Vector2.zero, layout.ActionButtonSize);
+            play3DButton = RuntimeUiFactory.CreateButton(manualInputRoot, "Play3DButton", T("play_3d"), Vector2.zero, layout.ActionButtonSize);
+            Button solverBackButton = RuntimeUiFactory.CreateButton(manualInputRoot, "ManualSolverBackButton", T("back"), Vector2.zero, layout.ActionButtonSize);
+            Button debugButton = RuntimeUiFactory.CreateButton(manualInputRoot, "SolverDebugButton", T("debug"), Vector2.zero, Vector2.zero);
             validateButtonRect = validateButton.GetComponent<RectTransform>();
             clearButtonRect = clearButton.GetComponent<RectTransform>();
             solveButtonRect = solveButton.GetComponent<RectTransform>();
@@ -360,7 +361,7 @@ namespace CubeChallenge3D.UI.Solver
             solverBackButtonRect = solverBackButton.GetComponent<RectTransform>();
             CreateSolverTicketCountContent(solveButtonRect);
             debugButton.gameObject.SetActive(ShowDebugPanel && (Application.isEditor || Debug.isDebugBuild));
-            Button closeButton = RuntimeUiFactory.CreateButton(manualInputRoot, "CloseButton", "Close", Vector2.zero, Vector2.zero);
+            Button closeButton = RuntimeUiFactory.CreateButton(manualInputRoot, "CloseButton", T("close"), Vector2.zero, Vector2.zero);
             validateButton.onClick.AddListener(Validate);
             resetButton.onClick.AddListener(ResetSolved);
             clearButton.onClick.AddListener(ClearInput);
@@ -434,11 +435,11 @@ namespace CubeChallenge3D.UI.Solver
         private void SetLearnMode(bool enabled)
         {
             learnMode = enabled;
-            titleText.text = learnMode ? "Learn Basics" : "Manual Solver";
+            titleText.text = learnMode ? T("learn_basics") : T("manual_solver");
             SetManualObjectsActive(!learnMode);
             statusText.text = learnMode
-                ? "Learn faces, turns, and notation from the Solver & Learn menu."
-                : "Select a color, then enter the stickers.";
+                ? T("solver_learn_hint")
+                : T("solver_instruction");
             debugText.text = learnMode
                 ? string.Empty
                 : BuildDebugText();
@@ -762,7 +763,7 @@ namespace CubeChallenge3D.UI.Solver
             solverTicketIconImage.color = Color.white;
             solverTicketIconImage.raycastTarget = false;
 
-            solverTicketCountText = RuntimeUiFactory.CreateText(parent, "SolverTicketCount", "Solve x 0", 34, TextAnchor.MiddleLeft);
+            solverTicketCountText = RuntimeUiFactory.CreateText(parent, "SolverTicketCount", string.Format(T("solve_count"), 0), 34, TextAnchor.MiddleLeft);
             solverTicketCountText.fontStyle = FontStyle.Bold;
             solverTicketCountText.color = Color.white;
             RectTransform textRect = solverTicketCountText.rectTransform;
@@ -812,12 +813,12 @@ namespace CubeChallenge3D.UI.Solver
 
             if (instructionText != null)
             {
-                instructionText.text = "Select a color, then enter the stickers.";
+                instructionText.text = T("solver_instruction");
             }
 
             if (solverTicketCountText != null)
             {
-                solverTicketCountText.text = $"Solve x {inventoryStore.SolverTickets}";
+                solverTicketCountText.text = string.Format(T("solve_count"), inventoryStore.SolverTickets);
             }
 
             for (int i = 0; i < cellButtons.Count; i++)
@@ -1107,8 +1108,8 @@ namespace CubeChallenge3D.UI.Solver
 
             if (!TryCreateRequest(out SolverRequest request, out string error))
             {
-                statusText.text = $"Invalid cube input.\n{error}";
-                resultText.text = BuildFailureResultText("Invalid cube input", error, null);
+                statusText.text = $"{T("invalid_cube_input")}.\n{error}";
+                resultText.text = BuildFailureResultText(T("invalid_cube_input"), error, null);
                 validationText.text = BuildValidationSummary();
                 debugText.text = BuildDebugText();
                 UpdateGuidanceButtons();
@@ -1118,11 +1119,11 @@ namespace CubeChallenge3D.UI.Solver
             SolverValidationResult result = solverEngine.Validate(request);
             validationPassedForCurrentInput = result.isValid;
             statusText.text = result.isValid
-                ? "Cube input is valid."
+                ? T("cube_input_valid")
                 : result.userMessage;
             resultText.text = result.isValid
-                ? "Status: Validation passed\nReady to solve."
-                : BuildFailureResultText("Invalid cube", result.userMessage, result.errorCode);
+                ? $"{T("status_label")}: {T("validation_passed")}\n{T("ready_to_solve")}."
+                : BuildFailureResultText(T("invalid_cube"), result.userMessage, result.errorCode);
             validationText.text = BuildValidationSummary();
             debugText.text = BuildDebugText();
             UpdateGuidanceButtons();
@@ -1136,8 +1137,8 @@ namespace CubeChallenge3D.UI.Solver
             inputCube3DView?.SetState(state);
             inputCube3DView?.ResetToFront();
             InvalidateSolverProgress();
-            statusText.text = "Reset to solved cube.";
-            resultText.text = "Status: Cube is already solved\nMoves: 0\nSolution: No moves needed";
+            statusText.text = T("reset_to_solved_cube");
+            resultText.text = $"{T("status_label")}: {T("cube_already_solved")}\n{T("moves_label")}: 0\n{T("solution_label")}: {T("no_moves_needed")}";
             Refresh();
         }
 
@@ -1150,8 +1151,8 @@ namespace CubeChallenge3D.UI.Solver
             }
 
             InvalidateSolverProgress();
-            statusText.text = "Input cleared.";
-            resultText.text = "Result: Not solved yet.";
+            statusText.text = T("input_cleared");
+            resultText.text = T("solver_result_not_solved");
             inputCube3DView?.RefreshColors();
             Refresh();
         }
@@ -1159,7 +1160,7 @@ namespace CubeChallenge3D.UI.Solver
         private void Save()
         {
             bool saved = store.Save(state);
-            statusText.text = saved ? "Solver input saved." : "Save failed.";
+            statusText.text = saved ? T("solver_input_saved") : T("save_failed");
             Refresh();
         }
 
@@ -1168,8 +1169,8 @@ namespace CubeChallenge3D.UI.Solver
             state = store.Load();
             inputCube3DView?.SetState(state);
             InvalidateSolverProgress();
-            statusText.text = "Solver input loaded.";
-            resultText.text = "Result: Loaded input. Press Solve to calculate a solution.";
+            statusText.text = T("solver_input_loaded");
+            resultText.text = T("solver_loaded_press_solve");
             Refresh();
         }
 
@@ -1194,8 +1195,8 @@ namespace CubeChallenge3D.UI.Solver
                 }
 
                 play3DButton.interactable = false;
-                statusText.text = $"Invalid cube input.\n{error}";
-                resultText.text = BuildFailureResultText("Invalid cube input", error, null);
+                statusText.text = $"{T("invalid_cube_input")}.\n{error}";
+                resultText.text = BuildFailureResultText(T("invalid_cube_input"), error, null);
                 Refresh();
                 return;
             }
@@ -1205,15 +1206,15 @@ namespace CubeChallenge3D.UI.Solver
             {
                 lastSolution = null;
                 play3DButton.interactable = false;
-                statusText.text = "No solver uses available.\nUse a Solver Ticket or earn more uses later.";
-                resultText.text = "Status: Solver unavailable\nNo free solver uses or solver tickets are available.";
+                statusText.text = T("no_solver_uses_available");
+                resultText.text = $"{T("status_label")}: {T("solver_unavailable")}\n{T("no_free_solver_uses")}";
                 Refresh();
                 return;
             }
 
             isSolving = true;
-            statusText.text = "Solving...";
-            resultText.text = "Status: Solving...";
+            statusText.text = T("solving");
+            resultText.text = $"{T("status_label")}: {T("solving")}";
             SolverValidationResult validation = solverEngine.Validate(request);
             if (!validation.isValid)
             {
@@ -1230,7 +1231,7 @@ namespace CubeChallenge3D.UI.Solver
                 }
 
                 statusText.text = validation.userMessage;
-                resultText.text = BuildFailureResultText("Invalid cube", validation.userMessage, validation.errorCode);
+                resultText.text = BuildFailureResultText(T("invalid_cube"), validation.userMessage, validation.errorCode);
                 validationText.text = BuildValidationSummary();
                 if (ShowDebugPanel)
                 {
@@ -1257,15 +1258,15 @@ namespace CubeChallenge3D.UI.Solver
                 play3DButton.interactable = result.moveCount > 0;
                 solutionReadyForCurrentInput = true;
                 string usageMessage = ConsumeSolverUseIfNeeded(result.moveCount);
-                statusText.text = $"Solver status: {result.message}";
+                statusText.text = $"{T("solver_status")}: {result.message}";
                 resultText.text = BuildSuccessResultText(result, usageMessage);
             }
             else if (result.errorCode == SolverErrorCode.SolverNotConnected || result.errorCode == SolverErrorCode.SolverEngineNotImplemented)
             {
                 lastSolution = null;
                 play3DButton.interactable = false;
-                statusText.text = $"{result.message}\nFree solver uses today: {usageStore.RemainingFreeUses} | Solver tickets: {inventoryStore.SolverTickets}";
-                resultText.text = BuildFailureResultText("Solver not connected", result.message, result.errorCode);
+                statusText.text = $"{result.message}\n{T("free_solver_uses_today")}: {usageStore.RemainingFreeUses} | {T("solver_tickets")}: {inventoryStore.SolverTickets}";
+                resultText.text = BuildFailureResultText(T("solver_not_connected"), result.message, result.errorCode);
             }
             else if (result.isValidCube)
             {
@@ -1273,9 +1274,9 @@ namespace CubeChallenge3D.UI.Solver
                 solutionReadyForCurrentInput = false;
                 play3DButton.interactable = false;
                 statusText.text = result.errorCode == SolverErrorCode.Timeout
-                    ? "The current solver timed out."
-                    : "This cube is valid, but the current solver could not find a solution.";
-                resultText.text = BuildFailureResultText("Solution not found", FriendlySolverMessage(result), result.errorCode);
+                    ? T("solver_timed_out")
+                    : T("solver_solution_not_found_valid");
+                resultText.text = BuildFailureResultText(T("solution_not_found"), FriendlySolverMessage(result), result.errorCode);
             }
             else
             {
@@ -1288,8 +1289,8 @@ namespace CubeChallenge3D.UI.Solver
                 }
 
                 play3DButton.interactable = false;
-                statusText.text = $"Invalid cube state.\n{result.message}\nPlease check corner and edge colors.";
-                resultText.text = BuildFailureResultText("Invalid cube state", FriendlySolverMessage(result), result.errorCode);
+                statusText.text = $"{T("invalid_cube_state")}.\n{result.message}\n{T("check_corner_edge_colors")}";
+                resultText.text = BuildFailureResultText(T("invalid_cube_state"), FriendlySolverMessage(result), result.errorCode);
             }
 
             if (ShowDebugPanel)
@@ -1314,13 +1315,13 @@ namespace CubeChallenge3D.UI.Solver
             StopPulse(play3DButton);
             if (lastSolution == null)
             {
-                statusText.text = "No solver solution available.";
+                statusText.text = T("no_solver_solution_available");
                 return;
             }
 
             if (lastSolution.moveNotations == null || lastSolution.moveNotations.Length == 0)
             {
-                statusText.text = "No moves needed. Cube is already solved.";
+                statusText.text = T("no_moves_needed_cube_solved");
                 return;
             }
 
@@ -1341,26 +1342,26 @@ namespace CubeChallenge3D.UI.Solver
         {
             if (IsSolverUsageBypassed())
             {
-                return "Dev mode: solver use not consumed.";
+                return T("dev_solver_not_consumed");
             }
 
             if (moveCount <= 0)
             {
-                return "Solver use not consumed.";
+                return T("solver_use_not_consumed");
             }
 
             if (usageStore.TryUseFree(System.DateTime.UtcNow))
             {
-                return $"Free solver uses today: {usageStore.RemainingFreeUses}";
+                return $"{T("free_solver_uses_today")}: {usageStore.RemainingFreeUses}";
             }
 
             if (inventoryStore.TryConsume(StageAssistItemType.SolverTicket))
             {
                 usageStore.AddTicketUse(System.DateTime.UtcNow);
-                return $"Solver ticket used. Tickets: {inventoryStore.SolverTickets}";
+                return $"{T("solver_ticket_used")} {T("tickets")}: {inventoryStore.SolverTickets}";
             }
 
-            return "Solution found, but no solver use was consumed.";
+            return T("solution_found_no_use_consumed");
         }
 
         private static bool IsSolverUsageBypassed()
@@ -1372,22 +1373,22 @@ namespace CubeChallenge3D.UI.Solver
         {
             if (result == null)
             {
-                return "Status: Failed\nSolver returned no result.";
+                return $"{T("status_label")}: {T("failed")}\n{T("solver_returned_no_result")}";
             }
 
             if (result.moveCount <= 0)
             {
-                return "Status: Cube is already solved\nMoves: 0\nSolution: No moves needed";
+                return $"{T("status_label")}: {T("cube_already_solved")}\n{T("moves_label")}: 0\n{T("solution_label")}: {T("no_moves_needed")}";
             }
 
-            return $"Status: Solution found\nMoves: {result.moveCount}\nSolution: {DisplaySolution(result.solutionNotation)}\nMoves list:\n{BuildMoveList(result.moveNotations)}\n{usageMessage}";
+            return $"{T("status_label")}: {T("solution_found")}\n{T("moves_label")}: {result.moveCount}\n{T("solution_label")}: {DisplaySolution(result.solutionNotation)}\n{T("moves_list")}:\n{BuildMoveList(result.moveNotations)}\n{usageMessage}";
         }
 
         private static string BuildMoveList(string[] moveNotations)
         {
             if (moveNotations == null || moveNotations.Length == 0)
             {
-                return "No moves needed";
+                return T("no_moves_needed");
             }
 
             const int maxDisplayedMoves = 18;
@@ -1400,7 +1401,7 @@ namespace CubeChallenge3D.UI.Solver
 
             if (moveNotations.Length > maxDisplayedMoves)
             {
-                lines.Add($"... {moveNotations.Length - maxDisplayedMoves} more");
+                lines.Add($"... {moveNotations.Length - maxDisplayedMoves} {T("more")}");
             }
 
             return string.Join("   ", lines);
@@ -1408,43 +1409,43 @@ namespace CubeChallenge3D.UI.Solver
 
         private static string BuildFailureResultText(string status, string message, string errorCode)
         {
-            string friendly = string.IsNullOrWhiteSpace(message) ? "Please check the cube input." : message;
+            string friendly = string.IsNullOrWhiteSpace(message) ? T("please_check_cube_input") : message;
             return string.IsNullOrWhiteSpace(errorCode)
-                ? $"Status: {status}\n{friendly}"
-                : $"Status: {status}\n{friendly}\nCode: {errorCode}";
+                ? $"{T("status_label")}: {status}\n{friendly}"
+                : $"{T("status_label")}: {status}\n{friendly}\n{T("code_label")}: {errorCode}";
         }
 
         private static string FriendlySolverMessage(SolverResult result)
         {
             if (result == null)
             {
-                return "Solver returned no result.";
+                return T("solver_returned_no_result");
             }
 
             switch (result.errorCode)
             {
                 case SolverErrorCode.InvalidColorCount:
-                    return "Check color counts. Each color must appear 9 times.";
+                    return T("check_color_counts");
                 case SolverErrorCode.DuplicateCenters:
-                    return "Center colors must be unique.";
+                    return T("center_colors_unique");
                 case SolverErrorCode.InvalidCornerCubie:
                 case SolverErrorCode.InvalidEdgeCubie:
                 case SolverErrorCode.InvalidCubieState:
                 case SolverErrorCode.ParityError:
                 case SolverErrorCode.TwistError:
                 case SolverErrorCode.FlipError:
-                    return "Invalid cube state. This cube cannot be solved from normal turns.";
+                    return T("invalid_cube_state_unsolvable");
                 case SolverErrorCode.Timeout:
-                    return "The current solver timed out.";
+                    return T("solver_timed_out");
                 case SolverErrorCode.CurrentSolverLimitation:
                 case SolverErrorCode.SolutionNotFound:
-                    return "This cube is valid, but the current solver could not find a solution. A stronger solver engine is required for this pattern.";
+                    return T("solver_solution_not_found_stronger");
                 case SolverErrorCode.SolverNotConnected:
                 case SolverErrorCode.HighPerformanceEngineNotAvailable:
                 case SolverErrorCode.SolverEngineNotImplemented:
-                    return "Solver engine is not connected.";
+                    return T("solver_engine_not_connected");
                 default:
-                    return string.IsNullOrWhiteSpace(result.message) ? "Solver failed." : result.message;
+                    return string.IsNullOrWhiteSpace(result.message) ? T("solver_failed") : result.message;
             }
         }
 
@@ -1479,7 +1480,7 @@ namespace CubeChallenge3D.UI.Solver
         {
             string report = BuildSolverDebugReport();
             GUIUtility.systemCopyBuffer = report;
-            statusText.text = "Solver debug report copied and saved as the latest debug case.";
+            statusText.text = T("solver_debug_saved");
             resultText.text = report;
             Debug.Log(report);
         }
@@ -1675,7 +1676,7 @@ namespace CubeChallenge3D.UI.Solver
 
         private static string DisplaySolution(string notation)
         {
-            return string.IsNullOrWhiteSpace(notation) ? "(none)" : notation;
+            return string.IsNullOrWhiteSpace(notation) ? T("none_value") : notation;
         }
 
         private string BuildDebugText()
@@ -1708,15 +1709,15 @@ namespace CubeChallenge3D.UI.Solver
 
             SolverInputValidationResult result = SolverInputValidator.Validate(state);
             return result.isValid
-                ? $"Filled: {filled}/54 | Status: Ready"
-                : $"Filled: {filled}/54 | Status: {FirstValidationMessage(result)}";
+                ? $"{T("filled")}: {filled}/54 | {T("status_label")}: {T("ready")}"
+                : $"{T("filled")}: {filled}/54 | {T("status_label")}: {FirstValidationMessage(result)}";
         }
 
         private static string FirstValidationMessage(SolverInputValidationResult result)
         {
             if (result == null || result.messages == null || result.messages.Count == 0)
             {
-                return "Check input";
+                return T("check_input");
             }
 
             return result.messages[0];
@@ -1735,6 +1736,13 @@ namespace CubeChallenge3D.UI.Solver
             }
 
             return count;
+        }
+
+        private static string T(string key)
+        {
+            return LocalizationManager.Instance != null
+                ? LocalizationManager.Instance.GetText(key)
+                : key;
         }
 
         private static CubeColor GetPaletteColor(string name)
