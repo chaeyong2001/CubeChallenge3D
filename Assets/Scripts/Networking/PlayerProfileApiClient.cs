@@ -71,6 +71,126 @@ namespace CubeChallenge3D.Networking
 
         public async Task<PlayerProfileCreateResult> CreateProfileAsync(string profileId, string nickname, int avatarId)
         {
+            return await CreateProfileInternalAsync(profileId, nickname, avatarId, string.Empty);
+        }
+
+        public async Task<PlayerProfileCreateResult> CreateProfileWithGooglePlayAsync(
+            string profileId,
+            string nickname,
+            int avatarId,
+            string googlePlayGamesPlayerId)
+        {
+            return await CreateProfileInternalAsync(profileId, nickname, avatarId, googlePlayGamesPlayerId);
+        }
+
+        public async Task<GooglePlayProfileResolveResult> ResolveGooglePlayProfileAsync(string googlePlayGamesPlayerId)
+        {
+            if (!HasServerUrl)
+            {
+                return GooglePlayProfileResolveResult.Unavailable("Server URL is empty.");
+            }
+
+            GooglePlayProfileResolveRequestDto payload = new GooglePlayProfileResolveRequestDto
+            {
+                googlePlayGamesPlayerId = googlePlayGamesPlayerId
+            };
+            byte[] body = Encoding.UTF8.GetBytes(JsonUtility.ToJson(payload));
+            using (UnityWebRequest request = new UnityWebRequest($"{baseUrl}/players/resolve-google-play", UnityWebRequest.kHttpVerbPOST))
+            {
+                request.uploadHandler = new UploadHandlerRaw(body);
+                request.downloadHandler = new DownloadHandlerBuffer();
+                request.timeout = timeoutSeconds;
+                request.SetRequestHeader("Content-Type", "application/json");
+                await WaitForRequestAsync(request.SendWebRequest());
+
+                if (HasConnectionError(request))
+                {
+                    return GooglePlayProfileResolveResult.Unavailable(request.error);
+                }
+
+                if (HasProtocolError(request))
+                {
+                    return GooglePlayProfileResolveResult.Failed(ReadErrorMessage(request), request.responseCode);
+                }
+
+                GooglePlayProfileResolveResponseDto response = JsonUtility.FromJson<GooglePlayProfileResolveResponseDto>(request.downloadHandler.text);
+                if (response == null)
+                {
+                    return GooglePlayProfileResolveResult.Unavailable("Invalid Google Play profile resolve response.");
+                }
+
+                return new GooglePlayProfileResolveResult
+                {
+                    requestSucceeded = true,
+                    success = true,
+                    found = response.found,
+                    profile = response.profile,
+                    message = response.found ? "Google Play profile found." : "Google Play profile not found."
+                };
+            }
+        }
+
+        public async Task<GooglePlayProfileLinkResult> LinkGooglePlayAsync(
+            string profileId,
+            string googlePlayGamesPlayerId,
+            string displayName)
+        {
+            if (!HasServerUrl)
+            {
+                return GooglePlayProfileLinkResult.Unavailable("Server URL is empty.");
+            }
+
+            GooglePlayProfileLinkRequestDto payload = new GooglePlayProfileLinkRequestDto
+            {
+                profileId = profileId,
+                googlePlayGamesPlayerId = googlePlayGamesPlayerId,
+                displayName = displayName
+            };
+            byte[] body = Encoding.UTF8.GetBytes(JsonUtility.ToJson(payload));
+            using (UnityWebRequest request = new UnityWebRequest($"{baseUrl}/players/link-google-play", UnityWebRequest.kHttpVerbPOST))
+            {
+                request.uploadHandler = new UploadHandlerRaw(body);
+                request.downloadHandler = new DownloadHandlerBuffer();
+                request.timeout = timeoutSeconds;
+                request.SetRequestHeader("Content-Type", "application/json");
+                await WaitForRequestAsync(request.SendWebRequest());
+
+                if (HasConnectionError(request))
+                {
+                    return GooglePlayProfileLinkResult.Unavailable(request.error);
+                }
+
+                if (HasProtocolError(request))
+                {
+                    return GooglePlayProfileLinkResult.Failed(ReadErrorMessage(request), request.responseCode);
+                }
+
+                GooglePlayProfileLinkResponseDto response = JsonUtility.FromJson<GooglePlayProfileLinkResponseDto>(request.downloadHandler.text);
+                if (response == null || !response.success || response.profile == null)
+                {
+                    return GooglePlayProfileLinkResult.Failed(
+                        response != null && !string.IsNullOrWhiteSpace(response.message)
+                            ? response.message
+                            : "Invalid Google Play link response.",
+                        request.responseCode);
+                }
+
+                return new GooglePlayProfileLinkResult
+                {
+                    requestSucceeded = true,
+                    success = true,
+                    profile = response.profile,
+                    message = string.IsNullOrWhiteSpace(response.message) ? "Google Play account linked." : response.message
+                };
+            }
+        }
+
+        private async Task<PlayerProfileCreateResult> CreateProfileInternalAsync(
+            string profileId,
+            string nickname,
+            int avatarId,
+            string googlePlayGamesPlayerId)
+        {
             if (!HasServerUrl)
             {
                 return PlayerProfileCreateResult.Unavailable("Server URL is empty.");
@@ -80,7 +200,8 @@ namespace CubeChallenge3D.Networking
             {
                 profileId = profileId,
                 nickname = nickname,
-                avatarId = avatarId
+                avatarId = avatarId,
+                googlePlayPlayerId = googlePlayGamesPlayerId
             };
             string json = JsonUtility.ToJson(payload);
             byte[] body = Encoding.UTF8.GetBytes(json);
@@ -306,6 +427,75 @@ namespace CubeChallenge3D.Networking
     }
 
     [Serializable]
+    public sealed class GooglePlayProfileResolveResult
+    {
+        public bool requestSucceeded;
+        public bool success;
+        public bool found;
+        public long statusCode;
+        public string message;
+        public PlayerProfileResponseDto profile;
+
+        public bool IsUnavailable => !requestSucceeded;
+
+        public static GooglePlayProfileResolveResult Unavailable(string message)
+        {
+            return new GooglePlayProfileResolveResult
+            {
+                requestSucceeded = false,
+                success = false,
+                statusCode = 0,
+                message = message
+            };
+        }
+
+        public static GooglePlayProfileResolveResult Failed(string message, long statusCode)
+        {
+            return new GooglePlayProfileResolveResult
+            {
+                requestSucceeded = true,
+                success = false,
+                statusCode = statusCode,
+                message = message
+            };
+        }
+    }
+
+    [Serializable]
+    public sealed class GooglePlayProfileLinkResult
+    {
+        public bool requestSucceeded;
+        public bool success;
+        public long statusCode;
+        public string message;
+        public PlayerProfileResponseDto profile;
+
+        public bool IsUnavailable => !requestSucceeded;
+
+        public static GooglePlayProfileLinkResult Unavailable(string message)
+        {
+            return new GooglePlayProfileLinkResult
+            {
+                requestSucceeded = false,
+                success = false,
+                statusCode = 0,
+                message = message
+            };
+        }
+
+        public static GooglePlayProfileLinkResult Failed(string message, long statusCode)
+        {
+            return new GooglePlayProfileLinkResult
+            {
+                requestSucceeded = true,
+                success = false,
+                statusCode = statusCode,
+                message = message
+            };
+        }
+    }
+
+    [Serializable]
     public sealed class NicknameCheckResponseDto
     {
         public bool available;
@@ -320,6 +510,7 @@ namespace CubeChallenge3D.Networking
         public string profileId;
         public string nickname;
         public int avatarId;
+        public string googlePlayPlayerId;
     }
 
     [Serializable]
@@ -334,10 +525,41 @@ namespace CubeChallenge3D.Networking
         public string profileId;
         public string nickname;
         public int avatarId;
+        public string googlePlayPlayerId;
+        public string googlePlayGamesPlayerId;
         public string createdAt;
         public string updatedAt;
         public bool linkedGooglePlay;
         public bool linkedGoogle;
+    }
+
+    [Serializable]
+    public sealed class GooglePlayProfileResolveRequestDto
+    {
+        public string googlePlayGamesPlayerId;
+    }
+
+    [Serializable]
+    public sealed class GooglePlayProfileResolveResponseDto
+    {
+        public bool found;
+        public PlayerProfileResponseDto profile;
+    }
+
+    [Serializable]
+    public sealed class GooglePlayProfileLinkRequestDto
+    {
+        public string profileId;
+        public string googlePlayGamesPlayerId;
+        public string displayName;
+    }
+
+    [Serializable]
+    public sealed class GooglePlayProfileLinkResponseDto
+    {
+        public bool success;
+        public PlayerProfileResponseDto profile;
+        public string message;
     }
 
     [Serializable]

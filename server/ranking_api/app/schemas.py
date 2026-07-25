@@ -125,6 +125,17 @@ class PlayerProfileCreateRequest(BaseModel):
     googleEmailHash: Optional[str] = None
 
 
+class PlayerProfileResponse(BaseModel):
+    profileId: str
+    nickname: str
+    avatarId: int
+    createdAt: str
+    updatedAt: str
+    linkedGooglePlay: bool
+    linkedGoogle: bool
+    googlePlayGamesPlayerId: Optional[str] = None
+
+
 class PlayerAvatarUpdateRequest(BaseModel):
     avatarId: int = Field(..., ge=0, le=3)
 
@@ -132,6 +143,27 @@ class PlayerAvatarUpdateRequest(BaseModel):
 class GooglePlayLinkRequest(BaseModel):
     googlePlayPlayerId: str = Field(..., min_length=1, max_length=160)
     displayName: Optional[str] = None
+
+
+class GooglePlayProfileResolveRequest(BaseModel):
+    googlePlayGamesPlayerId: str = Field(..., min_length=1, max_length=160)
+
+
+class GooglePlayProfileLinkRequest(BaseModel):
+    profileId: str = Field(..., min_length=1, max_length=120)
+    googlePlayGamesPlayerId: str = Field(..., min_length=1, max_length=160)
+    displayName: Optional[str] = None
+
+
+class GooglePlayProfileLinkResponse(BaseModel):
+    success: bool
+    profile: Optional[PlayerProfileResponse] = None
+    message: str = ""
+
+
+class GooglePlayProfileResolveResponse(BaseModel):
+    found: bool
+    profile: Optional[PlayerProfileResponse] = None
 
 
 class GoogleLinkRequest(BaseModel):
@@ -178,16 +210,6 @@ class CloudSaveDownloadResponse(BaseModel):
     payload: Dict[str, Any]
     serverUpdatedAt: str
     payloadHash: Optional[str] = None
-
-
-class PlayerProfileResponse(BaseModel):
-    profileId: str
-    nickname: str
-    avatarId: int
-    createdAt: str
-    updatedAt: str
-    linkedGooglePlay: bool
-    linkedGoogle: bool
 
 
 class StageProgressSubmitRequest(BaseModel):

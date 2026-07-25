@@ -12,6 +12,7 @@ from app.nickname_validator import nickname_key, validate_nickname
 from app.player_service import (
     PlayerProfileError,
     create_profile,
+    get_profile_by_google_play_id,
     get_profile_by_id,
     get_profile_by_nickname_key,
     link_google,
@@ -27,6 +28,10 @@ from app.schemas import (
     CloudSaveUploadResponse,
     GoogleLinkRequest,
     GooglePlayLinkRequest,
+    GooglePlayProfileLinkRequest,
+    GooglePlayProfileLinkResponse,
+    GooglePlayProfileResolveRequest,
+    GooglePlayProfileResolveResponse,
     NicknameCheckResponse,
     PlayerAvatarUpdateRequest,
     PlayerProfileCreateRequest,
@@ -78,6 +83,38 @@ def create_player_profile(
     except PlayerProfileError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.message) from exc
     return to_player_profile_response(row)
+
+
+@router.post("/resolve-google-play", response_model=GooglePlayProfileResolveResponse)
+def resolve_google_play_profile(
+    payload: GooglePlayProfileResolveRequest,
+    db: Session = Depends(get_db),
+):
+    row = get_profile_by_google_play_id(db, payload.googlePlayGamesPlayerId)
+    if row is None:
+        return GooglePlayProfileResolveResponse(found=False, profile=None)
+
+    return GooglePlayProfileResolveResponse(
+        found=True,
+        profile=to_player_profile_response(row),
+    )
+
+
+@router.post("/link-google-play", response_model=GooglePlayProfileLinkResponse)
+def link_google_play_profile(
+    payload: GooglePlayProfileLinkRequest,
+    db: Session = Depends(get_db),
+):
+    try:
+        row = link_google_play(db, payload.profileId, payload.googlePlayGamesPlayerId)
+    except PlayerProfileError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.message) from exc
+
+    return GooglePlayProfileLinkResponse(
+        success=True,
+        profile=to_player_profile_response(row),
+        message="Google Play Games account linked.",
+    )
 
 
 @router.get("/{profile_id}", response_model=PlayerProfileResponse)

@@ -31,7 +31,6 @@ namespace CubeChallenge3D.UI.Settings
         private SettingsStore settingsStore;
         private PlayerProfileStore profileStore;
         private PlayerProfileApiClient profileApiClient;
-        private AccountLinkApiClient accountLinkApiClient;
         private GooglePlayGamesAuthService googlePlayGames;
 
         private GameObject root;
@@ -69,9 +68,6 @@ namespace CubeChallenge3D.UI.Settings
             LocalizationManager.Instance?.SetLanguageFromCode(settingsStore.Current.languageCode);
             profileStore = new PlayerProfileStore();
             profileApiClient = new PlayerProfileApiClient(
-                settingsStore.Current.rankingApiBaseUrl,
-                settingsStore.Current.rankingRequestTimeoutSeconds);
-            accountLinkApiClient = new AccountLinkApiClient(
                 settingsStore.Current.rankingApiBaseUrl,
                 settingsStore.Current.rankingRequestTimeoutSeconds);
             googlePlayGames = new GooglePlayGamesAuthService();
@@ -727,31 +723,46 @@ namespace CubeChallenge3D.UI.Settings
             AccountLinkState result = await googlePlayGames.SignInAsync();
             if (!result.success)
             {
-                Debug.LogWarning($"[GPGS] Manual sign-in failed: message={result.message}");
+                Debug.LogWarning($"[GPGS] Manual sign-in failed. message={result.message}");
                 profileStore.UpdateGooglePlayLink(string.Empty, string.IsNullOrWhiteSpace(result.message) ? T("google_play_failed") : result.message);
                 SetMessage(T("google_play_failed"));
                 RefreshLabels();
                 return;
             }
 
-            Debug.Log($"[GPGS] Manual sign-in success: playerId={MaskId(result.providerUserId)}");
-            Debug.Log($"[Profile] Link guest profile to google start: profileId={profile.profileId} googlePlayPlayerId={MaskId(result.providerUserId)}");
-            AccountLinkResult linkResult = accountLinkApiClient != null
-                ? await accountLinkApiClient.LinkGooglePlayAsync(profile.profileId, result.providerUserId, result.displayName)
-                : AccountLinkResult.Unavailable("Account link API is not initialized.");
-
-            if (!linkResult.success)
+            Debug.Log($"[GPGS] Manual sign-in success playerId={MaskId(result.providerUserId)}");
+            Debug.Log($"[Profile] Link Google Play start profileId={profile.profileId}");
+            GooglePlayProfileLinkResult link = await profileApiClient.LinkGooglePlayAsync(
+                profile.profileId,
+                result.providerUserId,
+                result.displayName);
+            if (!link.success)
             {
-                string message = string.IsNullOrWhiteSpace(linkResult.message) ? T("google_play_failed") : linkResult.message;
-                Debug.LogWarning($"[Profile] Link guest profile to google failed: status={linkResult.statusCode} message={message}");
+                string message = string.IsNullOrWhiteSpace(link.message)
+                    ? "Google Play link failed."
+                    : link.message;
+                if (link.statusCode == 409)
+                {
+                    Debug.LogWarning("[Profile] Link Google Play conflict");
+                    message = "This Google Play account is already linked to another profile.";
+                }
+                else
+                {
+                    Debug.LogWarning($"[Profile] Link Google Play failed status={link.statusCode} message={message}");
+                }
+
                 profileStore.UpdateGooglePlayLink(string.Empty, message);
                 SetMessage(message);
                 RefreshLabels();
                 return;
             }
 
-            Debug.Log("[Profile] Link guest profile to google success.");
-            profileStore.UpdateGooglePlayLink(result.providerUserId, string.Empty);
+            Debug.Log("[Profile] Link Google Play success");
+            string linkedGooglePlayId = FirstNonEmpty(
+                link.profile?.googlePlayGamesPlayerId,
+                link.profile?.googlePlayPlayerId,
+                result.providerUserId);
+            profileStore.UpdateGooglePlayLink(linkedGooglePlayId, result.displayName, string.Empty);
             SetMessage(T("google_play_connected"));
             RefreshLabels();
         }
@@ -764,12 +775,12 @@ namespace CubeChallenge3D.UI.Settings
             }
 
             string trimmed = value.Trim();
-            if (trimmed.Length <= 8)
+            if (trimmed.Length <= 6)
             {
                 return "***";
             }
 
-            return $"{trimmed.Substring(0, 4)}...{trimmed.Substring(trimmed.Length - 4)}";
+            return $"{trimmed.Substring(0, 3)}***{trimmed.Substring(trimmed.Length - 3)}";
         }
 
         private void ShowNicknamePopup()
@@ -1062,6 +1073,24 @@ namespace CubeChallenge3D.UI.Settings
         private static string FirstNonEmpty(string value, string fallback)
         {
             return string.IsNullOrWhiteSpace(value) ? fallback : value;
+        }
+
+        private static string FirstNonEmpty(params string[] values)
+        {
+            if (values == null)
+            {
+                return string.Empty;
+            }
+
+            foreach (string value in values)
+            {
+                if (!string.IsNullOrWhiteSpace(value))
+                {
+                    return value;
+                }
+            }
+
+            return string.Empty;
         }
 
         private static Sprite LoadAvatarSprite(int avatarId)

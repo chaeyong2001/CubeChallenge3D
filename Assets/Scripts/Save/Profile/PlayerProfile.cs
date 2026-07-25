@@ -14,6 +14,8 @@ namespace CubeChallenge3D.Save.Profile
         public bool linkedGooglePlay;
         public bool linkedGoogle;
         public string googlePlayPlayerId;
+        public string googlePlayDisplayName;
+        public string lastGooglePlaySignInAt;
         public string googleAccountId;
         public string googleEmailHash;
         public string lastAccountLinkAttemptUtc;
@@ -39,6 +41,8 @@ namespace CubeChallenge3D.Save.Profile
                 linkedGooglePlay = false,
                 linkedGoogle = false,
                 googlePlayPlayerId = string.Empty,
+                googlePlayDisplayName = string.Empty,
+                lastGooglePlaySignInAt = string.Empty,
                 googleAccountId = string.Empty,
                 googleEmailHash = string.Empty,
                 lastAccountLinkAttemptUtc = string.Empty,

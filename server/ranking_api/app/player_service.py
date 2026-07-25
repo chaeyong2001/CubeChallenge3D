@@ -30,6 +30,7 @@ def to_player_profile_response(row: models.PlayerProfile) -> PlayerProfileRespon
         updatedAt=_format_utc(row.updated_at),
         linkedGooglePlay=bool(row.google_play_player_id),
         linkedGoogle=bool(row.google_account_id),
+        googlePlayGamesPlayerId=row.google_play_player_id,
     )
 
 
@@ -49,6 +50,18 @@ def get_profile_by_nickname_key(db: Session, normalized: str) -> Optional[models
     )
 
 
+def get_profile_by_google_play_id(db: Session, google_play_player_id: str) -> Optional[models.PlayerProfile]:
+    google_play_player_id = google_play_player_id.strip() if google_play_player_id else ""
+    if not google_play_player_id:
+        return None
+
+    return (
+        db.query(models.PlayerProfile)
+        .filter(models.PlayerProfile.google_play_player_id == google_play_player_id)
+        .first()
+    )
+
+
 def is_avatar_id_valid(avatar_id: int) -> bool:
     return MIN_AVATAR_ID <= avatar_id <= MAX_AVATAR_ID
 
@@ -61,6 +74,12 @@ def create_profile(db: Session, payload: PlayerProfileCreateRequest) -> models.P
     existing = get_profile_by_id(db, profile_id)
     if existing is not None:
         return existing
+
+    google_play_player_id = payload.googlePlayPlayerId.strip() if payload.googlePlayPlayerId else ""
+    if google_play_player_id:
+        existing_google = get_profile_by_google_play_id(db, google_play_player_id)
+        if existing_google is not None:
+            return existing_google
 
     validation = validate_nickname(payload.nickname)
     if not validation.valid:
@@ -86,7 +105,7 @@ def create_profile(db: Session, payload: PlayerProfileCreateRequest) -> models.P
         created_at=now,
         updated_at=now,
         last_seen_at=now,
-        google_play_player_id=payload.googlePlayPlayerId,
+        google_play_player_id=google_play_player_id or None,
         google_account_id=payload.googleAccountId,
         google_email_hash=payload.googleEmailHash,
     )
@@ -146,11 +165,7 @@ def link_google_play(db: Session, profile_id: str, google_play_player_id: str) -
     if not google_play_player_id:
         raise PlayerProfileError(400, "invalid_google_play", "googlePlayPlayerId is required.")
 
-    existing = (
-        db.query(models.PlayerProfile)
-        .filter(models.PlayerProfile.google_play_player_id == google_play_player_id)
-        .first()
-    )
+    existing = get_profile_by_google_play_id(db, google_play_player_id)
     if existing is not None and existing.profile_id != row.profile_id:
         raise PlayerProfileError(409, "google_play_conflict", "Google Play Games account is already linked.")
 

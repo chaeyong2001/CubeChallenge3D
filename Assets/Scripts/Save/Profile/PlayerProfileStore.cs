@@ -71,7 +71,9 @@ namespace CubeChallenge3D.Save.Profile
             bool serverSyncPending,
             string serverSyncError,
             string createdAtUtc,
-            string updatedAtUtc)
+            string updatedAtUtc,
+            string googlePlayPlayerId = "",
+            string googlePlayDisplayName = "")
         {
             NicknameValidationResult validation = NicknameValidator.Validate(nickname);
             if (!validation.IsValid)
@@ -99,6 +101,14 @@ namespace CubeChallenge3D.Save.Profile
             current.serverSyncPending = serverSyncPending;
             current.serverSyncError = serverSyncError ?? string.Empty;
             current.lastServerSyncAttemptUtc = DateTime.UtcNow.ToString("o");
+            if (!string.IsNullOrWhiteSpace(googlePlayPlayerId))
+            {
+                current.googlePlayPlayerId = googlePlayPlayerId;
+                current.googlePlayDisplayName = googlePlayDisplayName ?? string.Empty;
+                current.linkedGooglePlay = true;
+                current.lastGooglePlaySignInAt = DateTime.UtcNow.ToString("o");
+            }
+
             loaded = true;
             Save();
             Debug.Log($"[PlayerProfile] Created profileId={current.profileId} nickname={current.nickname} avatarId={current.avatarId} synced={current.isServerSynced} pending={current.serverSyncPending} path={ProfilePath}");
@@ -216,6 +226,11 @@ namespace CubeChallenge3D.Save.Profile
 
         public bool UpdateGooglePlayLink(string googlePlayPlayerId, string error)
         {
+            return UpdateGooglePlayLink(googlePlayPlayerId, string.Empty, error);
+        }
+
+        public bool UpdateGooglePlayLink(string googlePlayPlayerId, string googlePlayDisplayName, string error)
+        {
             if (!Exists())
             {
                 return false;
@@ -226,7 +241,9 @@ namespace CubeChallenge3D.Save.Profile
             if (!string.IsNullOrWhiteSpace(googlePlayPlayerId))
             {
                 Current.googlePlayPlayerId = googlePlayPlayerId;
+                Current.googlePlayDisplayName = googlePlayDisplayName ?? string.Empty;
                 Current.linkedGooglePlay = true;
+                Current.lastGooglePlaySignInAt = DateTime.UtcNow.ToString("o");
                 Current.accountLinkError = string.Empty;
                 Current.updatedAtUtc = DateTime.UtcNow.ToString("o");
             }
@@ -350,6 +367,18 @@ namespace CubeChallenge3D.Save.Profile
             if (profile.googlePlayPlayerId == null)
             {
                 profile.googlePlayPlayerId = string.Empty;
+                changed = true;
+            }
+
+            if (profile.googlePlayDisplayName == null)
+            {
+                profile.googlePlayDisplayName = string.Empty;
+                changed = true;
+            }
+
+            if (profile.lastGooglePlaySignInAt == null)
+            {
+                profile.lastGooglePlaySignInAt = string.Empty;
                 changed = true;
             }
 

@@ -33,6 +33,8 @@ namespace CubeChallenge3D.UI.Profile
         private readonly Text startButtonLabel;
         private int selectedAvatarId;
         private bool isSubmitting;
+        private string googlePlayGamesPlayerId = string.Empty;
+        private string googlePlayDisplayName = string.Empty;
 
         public ProfileSetupPanelUI(RectTransform parent, PlayerProfileStore store, PlayerProfileApiClient client, Action<PlayerProfile> onCreated)
         {
@@ -106,6 +108,12 @@ namespace CubeChallenge3D.UI.Profile
         }
 
         public RectTransform Root { get; }
+
+        public void SetGooglePlayContext(string playerId, string displayName)
+        {
+            googlePlayGamesPlayerId = playerId ?? string.Empty;
+            googlePlayDisplayName = displayName ?? string.Empty;
+        }
 
         public void SetVisible(bool visible)
         {
@@ -316,7 +324,9 @@ namespace CubeChallenge3D.UI.Profile
             }
 
             SetBusy(true, "Creating...");
-            PlayerProfileCreateResult create = await apiClient.CreateProfileAsync(profileId, nickname, selectedAvatarId);
+            PlayerProfileCreateResult create = string.IsNullOrWhiteSpace(googlePlayGamesPlayerId)
+                ? await apiClient.CreateProfileAsync(profileId, nickname, selectedAvatarId)
+                : await apiClient.CreateProfileWithGooglePlayAsync(profileId, nickname, selectedAvatarId, googlePlayGamesPlayerId);
             if (create.IsUnavailable)
             {
                 return CreateLocalFallback(nickname, profileId, create.message);
@@ -336,7 +346,9 @@ namespace CubeChallenge3D.UI.Profile
                 false,
                 string.Empty,
                 create.profile.createdAt,
-                create.profile.updatedAt);
+                create.profile.updatedAt,
+                FirstNonEmpty(create.profile.googlePlayGamesPlayerId, create.profile.googlePlayPlayerId, googlePlayGamesPlayerId),
+                googlePlayDisplayName);
             if (profile == null)
             {
                 SetError("Could not save profile.");
@@ -356,7 +368,9 @@ namespace CubeChallenge3D.UI.Profile
                 true,
                 reason ?? "Server unavailable.",
                 string.Empty,
-                string.Empty);
+                string.Empty,
+                googlePlayGamesPlayerId,
+                googlePlayDisplayName);
             if (profile == null)
             {
                 SetError("Could not save local profile.");
@@ -365,6 +379,24 @@ namespace CubeChallenge3D.UI.Profile
 
             SetStatus("Saved locally. Online sync will be tried later.");
             return profile;
+        }
+
+        private static string FirstNonEmpty(params string[] values)
+        {
+            if (values == null)
+            {
+                return string.Empty;
+            }
+
+            foreach (string value in values)
+            {
+                if (!string.IsNullOrWhiteSpace(value))
+                {
+                    return value;
+                }
+            }
+
+            return string.Empty;
         }
 
         private void SetBusy(bool busy, string buttonLabel)
