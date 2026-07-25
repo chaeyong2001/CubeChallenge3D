@@ -38,6 +38,7 @@ namespace CubeChallenge3D.UI.Learn
         private const float LessonListPanelBackGap = 32f;
         private const float LessonDetailPanelTopY = -455f;
         private const float LessonDetailPanelHeight = 1040f;
+        private const float LessonDemoContentHeight = 1020f;
 
         private readonly GameObject root;
         private readonly GameObject listRoot;
@@ -392,7 +393,7 @@ namespace CubeChallenge3D.UI.Learn
             float preferredHeight = RebuildDetailContent(currentLesson, substep, demoValid);
             detailContent.sizeDelta = new Vector2(0f, preferredHeight);
             lessonTextRoot.sizeDelta = new Vector2(0f, preferredHeight);
-            lessonDemoRoot.sizeDelta = new Vector2(0f, 940f);
+            lessonDemoRoot.sizeDelta = new Vector2(0f, LessonDemoContentHeight);
             bool hasCaseNavigation = HasCaseNavigation(currentLesson);
             ApplyDetailViewportBottomInset(hasCaseNavigation);
             ScrollRect detailScroll = detailContent.GetComponentInParent<ScrollRect>();
@@ -855,7 +856,7 @@ namespace CubeChallenge3D.UI.Learn
             lessonDemoRoot.gameObject.SetActive(true);
             ApplyDetailViewportBottomInset(false);
             SetCaseNavigationVisible(false);
-            detailContent.sizeDelta = new Vector2(0f, 940f);
+            detailContent.sizeDelta = new Vector2(0f, LessonDemoContentHeight);
             ScrollRect detailScroll = detailContent.GetComponentInParent<ScrollRect>();
             if (detailScroll != null)
             {

@@ -30,6 +30,7 @@ def to_player_profile_response(row: models.PlayerProfile) -> PlayerProfileRespon
         updatedAt=_format_utc(row.updated_at),
         linkedGooglePlay=bool(row.google_play_player_id),
         linkedGoogle=bool(row.google_account_id),
+        googlePlayPlayerId=row.google_play_player_id,
         googlePlayGamesPlayerId=row.google_play_player_id,
     )
 
@@ -75,7 +76,8 @@ def create_profile(db: Session, payload: PlayerProfileCreateRequest) -> models.P
     if existing is not None:
         return existing
 
-    google_play_player_id = payload.googlePlayPlayerId.strip() if payload.googlePlayPlayerId else ""
+    raw_google_play_player_id = payload.googlePlayGamesPlayerId or payload.googlePlayPlayerId
+    google_play_player_id = raw_google_play_player_id.strip() if raw_google_play_player_id else ""
     if google_play_player_id:
         existing_google = get_profile_by_google_play_id(db, google_play_player_id)
         if existing_google is not None:

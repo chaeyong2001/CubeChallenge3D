@@ -81,6 +81,41 @@ namespace CubeChallenge3D.Networking
             }
         }
 
+        public async Task<StageProgressRecordsResult> GetMyRankAsync(string mode, string playerId)
+        {
+            if (!HasServerUrl)
+            {
+                return StageProgressRecordsResult.Unavailable("Server URL is empty.");
+            }
+
+            if (string.IsNullOrWhiteSpace(playerId))
+            {
+                return StageProgressRecordsResult.Unavailable("Player id is empty.");
+            }
+
+            string url = $"{baseUrl}/stage-records/my-rank?mode={UnityWebRequest.EscapeURL(mode ?? string.Empty)}&playerId={UnityWebRequest.EscapeURL(playerId)}";
+            using (UnityWebRequest request = UnityWebRequest.Get(url))
+            {
+                request.timeout = timeoutSeconds;
+                await WaitForRequestAsync(request.SendWebRequest());
+
+                if (HasRequestError(request))
+                {
+                    return StageProgressRecordsResult.Unavailable(request.error);
+                }
+
+                StageProgressMyRankResponseDto response = JsonUtility.FromJson<StageProgressMyRankResponseDto>(request.downloadHandler.text);
+                return new StageProgressRecordsResult
+                {
+                    success = response != null && response.success,
+                    message = response != null ? response.message : "Invalid my-rank response.",
+                    records = response?.record != null
+                        ? new List<StageProgressRecordDto> { response.record }
+                        : new List<StageProgressRecordDto>()
+                };
+            }
+        }
+
         private static string NormalizeBaseUrl(string value)
         {
             string trimmed = (value ?? string.Empty).Trim();
@@ -143,6 +178,14 @@ namespace CubeChallenge3D.Networking
         public bool success;
         public string mode;
         public List<StageProgressRecordDto> records;
+    }
+
+    [Serializable]
+    public sealed class StageProgressMyRankResponseDto
+    {
+        public bool success;
+        public string message;
+        public StageProgressRecordDto record;
     }
 
     public sealed class StageProgressRecordsResult

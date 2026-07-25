@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using CubeChallenge3D.Ads;
 using CubeChallenge3D.Economy;
 using CubeChallenge3D.Save;
+using CubeChallenge3D.Save.Profile;
 using UnityEngine;
 using UnityEngine.Purchasing;
 
@@ -15,8 +16,11 @@ namespace CubeChallenge3D.IAP
         private const string FileName = "iap_purchases.json";
         private const string PurchaseUnavailableMessage = "Purchase is not available yet.\nPlease try again after updating from Google Play.";
         private const string ProductsUnavailableMessage = "Products are not available.\nPlease try again later.";
+        private const string PackageName = "com.FAMLEE.CubeChallenge3D";
 
         private readonly WalletStore walletStore;
+        private readonly PlayerProfileStore profileStore;
+        private readonly IapServerApiClient iapApiClient;
         private readonly Dictionary<string, Product> fetchedProducts = new Dictionary<string, Product>();
         private PromotionPurchaseData purchaseData;
         private StoreController storeController;
@@ -27,9 +31,14 @@ namespace CubeChallenge3D.IAP
 
         public event Action<string> StateChanged;
 
-        public PromotionPurchaseService(WalletStore wallet)
+        public PromotionPurchaseService(WalletStore wallet, PlayerProfileStore profile = null)
         {
             walletStore = wallet ?? new WalletStore();
+            profileStore = profile ?? new PlayerProfileStore();
+            SettingsStore settingsStore = new SettingsStore();
+            iapApiClient = new IapServerApiClient(
+                settingsStore.Current.rankingApiBaseUrl,
+                settingsStore.Current.rankingRequestTimeoutSeconds);
 
             if (IsProductOwned(PromotionProductIds.RemoveAds))
             {
@@ -37,6 +46,7 @@ namespace CubeChallenge3D.IAP
             }
 
 #if !UNITY_EDITOR
+            _ = SyncServerEntitlementsAsync();
             InitializeBilling();
 #endif
         }
@@ -225,6 +235,7 @@ namespace CubeChallenge3D.IAP
             unavailableMessage = productsFetched ? string.Empty : ProductsUnavailableMessage;
 
             storeController.FetchPurchases();
+            _ = SyncServerEntitlementsAsync();
             NotifyStateChanged(productsFetched ? "Products loaded from Google Play." : ProductsUnavailableMessage);
         }
 
@@ -237,7 +248,7 @@ namespace CubeChallenge3D.IAP
             NotifyStateChanged(ProductsUnavailableMessage);
         }
 
-        private void OnPurchasePending(PendingOrder order)
+        private async void OnPurchasePending(PendingOrder order)
         {
             string productId = GetProductId(order);
             if (string.IsNullOrEmpty(productId))
@@ -246,7 +257,7 @@ namespace CubeChallenge3D.IAP
                 return;
             }
 
-            PromotionPurchaseResult result = ApplyPurchasedProduct(productId, order.Info?.TransactionID, false);
+            PromotionPurchaseResult result = await VerifyAndApplyPurchasedProductAsync(productId, order, false);
             if (!result.success)
             {
                 NotifyStateChanged(result.message);
@@ -277,6 +288,11 @@ namespace CubeChallenge3D.IAP
 
         private void OnPurchasesFetched(Orders orders)
         {
+            _ = RestoreFetchedPurchasesAsync(orders);
+        }
+
+        private async Task RestoreFetchedPurchasesAsync(Orders orders)
+        {
             bool restoredRemoveAds = false;
             foreach (ConfirmedOrder order in orders?.ConfirmedOrders ?? Array.Empty<ConfirmedOrder>())
             {
@@ -284,8 +300,8 @@ namespace CubeChallenge3D.IAP
                 {
                     if (productId == PromotionProductIds.RemoveAds)
                     {
-                        ApplyPurchasedProduct(productId, order.Info?.TransactionID, true);
-                        restoredRemoveAds = true;
+                        PromotionPurchaseResult result = await VerifyAndApplyPurchasedProductAsync(productId, order, true);
+                        restoredRemoveAds |= result.success;
                     }
                 }
             }
@@ -331,6 +347,126 @@ namespace CubeChallenge3D.IAP
             return PromotionPurchaseResult.Success($"+{gems} Gems purchased.");
         }
 
+        private async Task SyncServerEntitlementsAsync()
+        {
+            if (!iapApiClient.HasServerUrl)
+            {
+                return;
+            }
+
+            PlayerProfile profile = profileStore.Current;
+            if (profile == null || string.IsNullOrWhiteSpace(profile.profileId))
+            {
+                return;
+            }
+
+            IapEntitlementsResult result = await iapApiClient.GetEntitlementsAsync(profile.profileId);
+            if (!result.success || result.profile == null)
+            {
+                Debug.LogWarning($"[IAP] Entitlement sync failed. message={result.message}");
+                return;
+            }
+
+            if (result.profile.removeAdsPurchased)
+            {
+                MarkNonConsumablePurchased(PromotionProductIds.RemoveAds);
+                AdManager.Instance.SetRemoveAdsPurchased(true);
+            }
+            else
+            {
+                ClearNonConsumablePurchased(PromotionProductIds.RemoveAds);
+                AdManager.Instance.SetRemoveAdsPurchased(false);
+            }
+
+            Debug.Log($"[IAP] Entitlement sync success profileId={profile.profileId} removeAdsPurchased={result.profile.removeAdsPurchased} refundDebtGems={result.profile.refundDebtGems}");
+        }
+
+        private async Task<PromotionPurchaseResult> VerifyAndApplyPurchasedProductAsync(string productId, Order order, bool restoreOnly)
+        {
+            if (restoreOnly && productId != PromotionProductIds.RemoveAds)
+            {
+                return PromotionPurchaseResult.Success("Consumable purchase restore skipped.");
+            }
+
+            if (!iapApiClient.HasServerUrl)
+            {
+                Debug.LogWarning("[IAP] Server verification skipped. reason=Server URL is empty.");
+                return PromotionPurchaseResult.Failed("Purchase verification server is not configured.");
+            }
+
+            PlayerProfile profile = profileStore.Current;
+            if (profile == null || string.IsNullOrWhiteSpace(profile.profileId))
+            {
+                return PromotionPurchaseResult.Failed("Create a profile before purchasing.");
+            }
+
+            GoogleReceiptFields receipt = ExtractGoogleReceipt(order);
+            string purchaseToken = !string.IsNullOrWhiteSpace(receipt.purchaseToken)
+                ? receipt.purchaseToken
+                : order?.Info?.TransactionID;
+            string orderId = !string.IsNullOrWhiteSpace(receipt.orderId)
+                ? receipt.orderId
+                : string.Empty;
+            string packageName = !string.IsNullOrWhiteSpace(receipt.packageName)
+                ? receipt.packageName
+                : PackageName;
+
+            if (string.IsNullOrWhiteSpace(purchaseToken))
+            {
+                return PromotionPurchaseResult.Failed("Purchase token was not found.");
+            }
+
+            Debug.Log($"[IAP] Purchase received productId={productId} token={MaskToken(purchaseToken)}");
+            Debug.Log($"[IAP] Server verification start productId={productId}");
+            IapVerifyResult result = await iapApiClient.VerifyGooglePurchaseAsync(new IapGoogleVerifyRequestDto
+            {
+                profileId = profile.profileId,
+                productId = productId,
+                purchaseToken = purchaseToken,
+                orderId = orderId,
+                packageName = packageName
+            });
+
+            if (!result.success || result.response == null || !result.response.success)
+            {
+                string code = result.errorCode ?? result.response?.errorCode ?? "VERIFY_FAILED";
+                Debug.LogWarning($"[IAP] Server verification failed productId={productId} errorCode={code} message={result.message}");
+                return PromotionPurchaseResult.Failed("Purchase verification failed. It will retry next time you open the shop.");
+            }
+
+            IapGoogleVerifyResponseDto response = result.response;
+            if (response.alreadyGranted)
+            {
+                Debug.Log($"[IAP] Duplicate purchase token. alreadyGranted=true productId={productId}");
+                if (response.profile != null && response.profile.removeAdsPurchased)
+                {
+                    MarkNonConsumablePurchased(PromotionProductIds.RemoveAds);
+                    AdManager.Instance.SetRemoveAdsPurchased(true);
+                }
+                return PromotionPurchaseResult.Success("Purchase already applied.");
+            }
+
+            if (response.purchase != null
+                && string.Equals(response.purchase.grantedCurrencyType, "gems", StringComparison.OrdinalIgnoreCase)
+                && response.purchase.grantedAmount > 0)
+            {
+                walletStore.AddGems(response.purchase.grantedAmount);
+                MarkTransactionProcessed(purchaseToken);
+                Debug.Log($"[IAP] Grant success productId={productId} amount={response.purchase.grantedAmount}");
+                return PromotionPurchaseResult.Success($"+{response.purchase.grantedAmount} Gems purchased.");
+            }
+
+            if (response.profile != null && response.profile.removeAdsPurchased)
+            {
+                MarkNonConsumablePurchased(productId);
+                AdManager.Instance.SetRemoveAdsPurchased(true);
+                Debug.Log("[IAP] RemoveAds entitlement granted");
+                return PromotionPurchaseResult.Success(restoreOnly ? "Remove Ads restored." : "Remove Ads purchased.");
+            }
+
+            return PromotionPurchaseResult.Failed("Purchase was verified but no reward was returned.");
+        }
+
         private static string GetProductId(Order order)
         {
             return GetProductIds(order).FirstOrDefault();
@@ -351,6 +487,52 @@ namespace CubeChallenge3D.IAP
                     yield return productId;
                 }
             }
+        }
+
+        private static GoogleReceiptFields ExtractGoogleReceipt(Order order)
+        {
+            string receipt = order?.Info?.Receipt;
+            if (string.IsNullOrWhiteSpace(receipt))
+            {
+                return new GoogleReceiptFields();
+            }
+
+            try
+            {
+                UnifiedReceiptDto unified = JsonUtility.FromJson<UnifiedReceiptDto>(receipt);
+                string payload = !string.IsNullOrWhiteSpace(unified?.Payload) ? unified.Payload : receipt;
+                GooglePayloadDto googlePayload = JsonUtility.FromJson<GooglePayloadDto>(payload);
+                string purchaseJson = !string.IsNullOrWhiteSpace(googlePayload?.json) ? googlePayload.json : payload;
+                GooglePurchaseJsonDto purchase = JsonUtility.FromJson<GooglePurchaseJsonDto>(purchaseJson);
+                return new GoogleReceiptFields
+                {
+                    orderId = purchase?.orderId ?? string.Empty,
+                    packageName = purchase?.packageName ?? string.Empty,
+                    productId = purchase?.productId ?? string.Empty,
+                    purchaseToken = purchase?.purchaseToken ?? string.Empty
+                };
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning($"[IAP] Receipt parse failed: {exception.Message}");
+                return new GoogleReceiptFields();
+            }
+        }
+
+        private static string MaskToken(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return "(empty)";
+            }
+
+            string trimmed = value.Trim();
+            if (trimmed.Length <= 8)
+            {
+                return "***";
+            }
+
+            return $"{trimmed.Substring(0, 4)}***{trimmed.Substring(trimmed.Length - 4)}";
         }
 
         private bool WasTransactionProcessed(string transactionId)
@@ -426,6 +608,20 @@ namespace CubeChallenge3D.IAP
             SaveService.SaveJson(FileName, data);
         }
 
+        private void ClearNonConsumablePurchased(string productId)
+        {
+            PromotionPurchaseData data = Load();
+            if (data.purchasedNonConsumableProductIds == null)
+            {
+                return;
+            }
+
+            if (data.purchasedNonConsumableProductIds.Remove(productId))
+            {
+                SaveService.SaveJson(FileName, data);
+            }
+        }
+
         private PromotionPurchaseData Load()
         {
             if (purchaseData == null)
@@ -468,6 +664,38 @@ namespace CubeChallenge3D.IAP
         public int saveVersion;
         public List<string> purchasedNonConsumableProductIds;
         public List<string> processedTransactionIds;
+    }
+
+    [Serializable]
+    internal sealed class UnifiedReceiptDto
+    {
+        public string Store = string.Empty;
+        public string TransactionID = string.Empty;
+        public string Payload = string.Empty;
+    }
+
+    [Serializable]
+    internal sealed class GooglePayloadDto
+    {
+        public string json = string.Empty;
+        public string signature = string.Empty;
+    }
+
+    [Serializable]
+    internal sealed class GooglePurchaseJsonDto
+    {
+        public string orderId = string.Empty;
+        public string packageName = string.Empty;
+        public string productId = string.Empty;
+        public string purchaseToken = string.Empty;
+    }
+
+    internal sealed class GoogleReceiptFields
+    {
+        public string orderId = string.Empty;
+        public string packageName = string.Empty;
+        public string productId = string.Empty;
+        public string purchaseToken = string.Empty;
     }
 
     public struct PromotionPurchaseResult

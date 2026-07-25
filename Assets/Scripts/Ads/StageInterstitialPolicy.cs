@@ -132,15 +132,17 @@ namespace CubeChallenge3D.Ads
             int interval,
             bool thresholdReached,
             bool removeAds,
-            bool canShow)
+            bool adShowAttempted)
         {
             double sessionMinutes = (DateTime.UtcNow - SessionStartedAtUtc).TotalMinutes;
             int localStageNumber = GetLocalStageNumber(stage);
+            bool longSession = IsLongSession();
             Debug.Log(
-                $"[AdsPolicy] event={eventName}, mode={stage.stageType}, stage={stage.stageNumber}, localStage={localStageNumber}, "
-                + $"clearsSinceLast={clearsSinceLast}, sessionClears={sessionEligibleClearCount}, "
-                + $"sessionMinutes={sessionMinutes:0.0}, interval={interval}, "
-                + $"removeAds={removeAds}, threshold={thresholdReached}, interstitialReady={canShow}");
+                $"[AdsPolicy] event={eventName}, selectedPlacement={InterstitialPlacement.StageClearTransition}, "
+                + $"mode={stage.stageType}, stage={stage.stageNumber}, localStageNumber={localStageNumber}, "
+                + $"eligibleClearCount={clearsSinceLast}, sessionEligibleClearCount={sessionEligibleClearCount}, "
+                + $"sessionMinutes={sessionMinutes:0.0}, longSession={longSession}, requiredClearInterval={interval}, "
+                + $"removeAdsPurchased={removeAds}, thresholdReached={thresholdReached}, adShowAttempted={adShowAttempted}");
         }
 #endif
     }

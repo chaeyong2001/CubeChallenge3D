@@ -99,17 +99,17 @@ namespace CubeChallenge3D.UI.Solver.Playback
             {
                 TitlePosition = new Vector2(0f, -24f),
                 TitleSize = new Vector2(720f, 48f),
-                CubeAreaPosition = new Vector2(0f, -86f),
-                CubeAreaSize = new Vector2(760f, 570f),
-                CurrentMoveTextPosition = new Vector2(0f, -668f),
+                CubeAreaPosition = new Vector2(0f, -78f),
+                CubeAreaSize = new Vector2(780f, 620f),
+                CurrentMoveTextPosition = new Vector2(0f, -728f),
                 CurrentMoveTextSize = new Vector2(820f, 50f),
-                MoveProgressTextPosition = new Vector2(0f, -718f),
+                MoveProgressTextPosition = new Vector2(0f, -778f),
                 MoveProgressTextSize = new Vector2(820f, 38f),
                 PlaybackButtonSize = new Vector2(360f, 76f),
-                PreviousButtonPosition = new Vector2(-205f, -805f),
-                NextButtonPosition = new Vector2(205f, -805f),
-                AutoPlayButtonPosition = new Vector2(-205f, -888f),
-                BackButtonPosition = new Vector2(205f, -888f)
+                PreviousButtonPosition = new Vector2(-205f, -882f),
+                NextButtonPosition = new Vector2(205f, -882f),
+                AutoPlayButtonPosition = new Vector2(-205f, -968f),
+                BackButtonPosition = new Vector2(205f, -968f)
             };
         }
 
@@ -244,6 +244,11 @@ namespace CubeChallenge3D.UI.Solver.Playback
             if (!TryLoadSolution(solution, out string error))
             {
                 root.SetActive(true);
+                if (embeddedMode)
+                {
+                    ApplyEmbeddedLayout();
+                }
+
                 if (canvas != null)
                 {
                     canvas.enabled = true;
@@ -256,6 +261,11 @@ namespace CubeChallenge3D.UI.Solver.Playback
             }
 
             root.SetActive(true);
+            if (embeddedMode)
+            {
+                ApplyEmbeddedLayout();
+            }
+
             if (canvas != null)
             {
                 canvas.enabled = true;
@@ -295,12 +305,12 @@ namespace CubeChallenge3D.UI.Solver.Playback
 
         public void SetCameraLocalPosition(Vector3 position)
         {
-            initialCameraLocalPosition = position;
+            initialCameraLocalPosition = AdjustForCompactEmbeddedCamera(position);
         }
 
         public void SetCompletionCameraLocalPosition(Vector3 position)
         {
-            completionCameraLocalPosition = position;
+            completionCameraLocalPosition = AdjustForCompactEmbeddedCamera(position);
             hasCompletionCameraPosition = true;
         }
 
@@ -560,6 +570,11 @@ namespace CubeChallenge3D.UI.Solver.Playback
             EmbeddedLayoutConfig layout = useCompactEmbeddedLayout
                 ? EmbeddedLayoutConfig.CompactLesson
                 : EmbeddedLayoutConfig.Default;
+            if (useCompactEmbeddedLayout)
+            {
+                layout = ResolveCompactLessonLayout(layout);
+            }
+
             SetTopAnchored(titleText.rectTransform, layout.TitlePosition, layout.TitleSize);
             SetTopAnchored(cubeImage.rectTransform, layout.CubeAreaPosition, layout.CubeAreaSize);
             SetCenterTopAnchored(moveText.rectTransform, layout.CurrentMoveTextPosition, layout.CurrentMoveTextSize);
@@ -580,6 +595,42 @@ namespace CubeChallenge3D.UI.Solver.Playback
             StyleEmbeddedButton(backButton);
         }
 
+        private EmbeddedLayoutConfig ResolveCompactLessonLayout(EmbeddedLayoutConfig layout)
+        {
+            const float fallbackHeight = 1020f;
+            const float buttonRowGap = 86f;
+            const float currentTextOffsetFromBottomRow = 240f;
+            const float progressTextOffsetFromBottomRow = 190f;
+            const float cubeToCurrentTextGap = 18f;
+
+            RectTransform panelRect = root != null ? root.GetComponent<RectTransform>() : null;
+            float panelHeight = panelRect != null ? panelRect.rect.height : 0f;
+            if (panelHeight < 100f && panelRect != null)
+            {
+                panelHeight = panelRect.sizeDelta.y;
+            }
+
+            if (panelHeight < 100f)
+            {
+                panelHeight = fallbackHeight;
+            }
+
+            float topGap = Mathf.Abs(layout.TitlePosition.y);
+            float bottomRowCenterY = -(panelHeight - topGap - (layout.PlaybackButtonSize.y * 0.5f));
+            layout.AutoPlayButtonPosition = new Vector2(layout.AutoPlayButtonPosition.x, bottomRowCenterY);
+            layout.BackButtonPosition = new Vector2(layout.BackButtonPosition.x, bottomRowCenterY);
+            layout.PreviousButtonPosition = new Vector2(layout.PreviousButtonPosition.x, bottomRowCenterY + buttonRowGap);
+            layout.NextButtonPosition = new Vector2(layout.NextButtonPosition.x, bottomRowCenterY + buttonRowGap);
+            layout.CurrentMoveTextPosition = new Vector2(layout.CurrentMoveTextPosition.x, bottomRowCenterY + currentTextOffsetFromBottomRow);
+            layout.MoveProgressTextPosition = new Vector2(layout.MoveProgressTextPosition.x, bottomRowCenterY + progressTextOffsetFromBottomRow);
+
+            float cubeTop = Mathf.Abs(layout.CubeAreaPosition.y);
+            float currentTextTop = Mathf.Abs(layout.CurrentMoveTextPosition.y) - (layout.CurrentMoveTextSize.y * 0.5f);
+            float cubeHeight = Mathf.Max(layout.CubeAreaSize.y, currentTextTop - cubeTop - cubeToCurrentTextGap);
+            layout.CubeAreaSize = new Vector2(layout.CubeAreaSize.x, cubeHeight);
+            return layout;
+        }
+
         private static void SetTopAnchored(RectTransform rect, Vector2 position, Vector2 size)
         {
             rect.anchorMin = new Vector2(0.5f, 1f);
@@ -587,6 +638,13 @@ namespace CubeChallenge3D.UI.Solver.Playback
             rect.pivot = new Vector2(0.5f, 1f);
             rect.anchoredPosition = position;
             rect.sizeDelta = size;
+        }
+
+        private Vector3 AdjustForCompactEmbeddedCamera(Vector3 position)
+        {
+            return embeddedMode && useCompactEmbeddedLayout
+                ? position * 0.87f
+                : position;
         }
 
         private static void SetCenterTopAnchored(RectTransform rect, Vector2 position, Vector2 size)

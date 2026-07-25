@@ -272,6 +272,7 @@ namespace CubeChallenge3D.UI.Common
             }
             coinValue.text = FormatCompactCount(walletStore.Coins);
             gemValue.text = FormatCompactCount(walletStore.Gems);
+            Debug.Log("[TopHUD] Refresh wallet state");
         }
 
         private static void CreateCurrencyCell(

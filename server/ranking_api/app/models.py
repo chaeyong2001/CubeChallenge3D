@@ -112,3 +112,61 @@ class WeeklyRankingReward(Base):
     __table_args__ = (
         UniqueConstraint("week_start_kst", "player_id", name="uq_weekly_ranking_reward_player_week"),
     )
+
+
+class IapPlayerEntitlement(Base):
+    __tablename__ = "iap_player_entitlements"
+
+    id = Column(Integer, primary_key=True, index=True)
+    profile_id = Column(String(120), ForeignKey("player_profiles.profile_id"), unique=True, nullable=False, index=True)
+    coins = Column(Integer, nullable=False, default=0)
+    gems = Column(Integer, nullable=False, default=0)
+    remove_ads_purchased = Column(Boolean, nullable=False, default=False)
+    refund_debt_gems = Column(Integer, nullable=False, default=0)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+
+class IapPurchase(Base):
+    __tablename__ = "iap_purchases"
+
+    id = Column(Integer, primary_key=True, index=True)
+    profile_id = Column(String(120), ForeignKey("player_profiles.profile_id"), nullable=False, index=True)
+    google_play_player_id = Column(String(160), nullable=True, index=True)
+    package_name = Column(String(160), nullable=False)
+    product_id = Column(String(120), nullable=False, index=True)
+    purchase_token = Column(Text, nullable=False)
+    purchase_token_hash = Column(String(160), unique=True, nullable=False, index=True)
+    order_id = Column(String(160), nullable=True, index=True)
+    product_type = Column(String(32), nullable=False)
+    purchase_state = Column(Integer, nullable=True)
+    acknowledgement_state = Column(Integer, nullable=True)
+    consumption_state = Column(Integer, nullable=True)
+    quantity = Column(Integer, nullable=False, default=1)
+    granted_currency_type = Column(String(32), nullable=True)
+    granted_amount = Column(Integer, nullable=False, default=0)
+    entitlement_key = Column(String(80), nullable=True)
+    status = Column(String(32), nullable=False, default="pending", index=True)
+    granted_at = Column(DateTime, nullable=True)
+    consumed_at = Column(DateTime, nullable=True)
+    acknowledged_at = Column(DateTime, nullable=True)
+    voided_at = Column(DateTime, nullable=True)
+    revoked_at = Column(DateTime, nullable=True)
+    voided_reason = Column(String(120), nullable=True)
+    raw_google_response = Column(Text, nullable=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+
+class IapRevocationLog(Base):
+    __tablename__ = "iap_revocation_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    purchase_id = Column(Integer, ForeignKey("iap_purchases.id"), nullable=True, index=True)
+    profile_id = Column(String(120), nullable=False, index=True)
+    action_type = Column(String(40), nullable=False)
+    amount = Column(Integer, nullable=False, default=0)
+    before_balance = Column(Integer, nullable=False, default=0)
+    after_balance = Column(Integer, nullable=False, default=0)
+    note = Column(Text, nullable=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)

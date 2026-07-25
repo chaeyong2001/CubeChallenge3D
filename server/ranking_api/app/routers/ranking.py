@@ -34,6 +34,27 @@ WEEKLY_REWARD_RULES = {
 
 @router.post("/submit", response_model=RankingSubmitResponse)
 def submit(payload: RankingSubmissionCreate, db: Session = Depends(get_db)):
+    previous_best = (
+        db.query(models.RankingSubmission)
+        .filter_by(challenge_id=payload.challengeId, player_id=payload.playerId)
+        .filter(models.RankingSubmission.is_verified.is_(True))
+        .order_by(
+            models.RankingSubmission.elapsed_seconds.asc(),
+            models.RankingSubmission.move_count.asc(),
+            models.RankingSubmission.created_at.asc(),
+        )
+        .first()
+    )
+    logger.info(
+        "Ranking submit start: submissionId=%s challengeId=%s profileId=%s nickname=%s elapsed=%.3f moves=%s previousBest=%s",
+        payload.submissionId,
+        payload.challengeId,
+        _mask_id(payload.playerId),
+        payload.playerName,
+        payload.elapsedSeconds,
+        payload.moveCount,
+        _format_record(previous_best),
+    )
     try:
         row, duplicate = create_submission(db, payload)
     except RankingValidationError as exc:
@@ -53,6 +74,27 @@ def submit(payload: RankingSubmissionCreate, db: Session = Depends(get_db)):
             },
         )
 
+    current_best = (
+        db.query(models.RankingSubmission)
+        .filter_by(challenge_id=payload.challengeId, player_id=payload.playerId)
+        .filter(models.RankingSubmission.is_verified.is_(True))
+        .order_by(
+            models.RankingSubmission.elapsed_seconds.asc(),
+            models.RankingSubmission.move_count.asc(),
+            models.RankingSubmission.created_at.asc(),
+        )
+        .first()
+    )
+    logger.info(
+        "Ranking submit saved: submissionId=%s duplicate=%s profileId=%s nickname=%s savedRecord=%s currentBest=%s savedRecordIsCurrentBest=%s",
+        row.submission_id,
+        duplicate,
+        _mask_id(row.player_id),
+        row.player_name,
+        _format_record(row),
+        _format_record(current_best),
+        current_best is not None and current_best.submission_id == row.submission_id,
+    )
     return RankingSubmitResponse(
         success=True,
         isVerified=row.is_verified,
@@ -303,6 +345,25 @@ def get_previous_week_window_kst() -> tuple[datetime, datetime]:
 
 def format_kst(value: datetime) -> str:
     return value.astimezone(KST).strftime("%Y-%m-%dT%H:%M:%S%z")
+
+
+def _mask_id(value: Optional[str]) -> str:
+    if not value:
+        return "(empty)"
+    trimmed = value.strip()
+    if len(trimmed) <= 6:
+        return "***"
+    return f"{trimmed[:3]}***{trimmed[-3:]}"
+
+
+def _format_record(row: Optional[models.RankingSubmission]) -> str:
+    if row is None:
+        return "none"
+    return (
+        f"submissionId={row.submission_id} "
+        f"elapsed={row.elapsed_seconds:.3f} "
+        f"moves={row.move_count}"
+    )
 
 
 def weekly_reward_to_response(reward: models.WeeklyRankingReward) -> WeeklyRankingRewardResponse:

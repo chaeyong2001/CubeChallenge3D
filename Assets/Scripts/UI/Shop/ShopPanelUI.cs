@@ -73,7 +73,7 @@ namespace CubeChallenge3D.UI.Shop
             walletStore = wallet ?? new WalletStore();
             inventoryStore = inventory ?? new InventoryStore();
             rewardService = rewards ?? RewardedAdService.CreateDefault();
-            promotionPurchaseService = new PromotionPurchaseService(walletStore);
+            promotionPurchaseService = new PromotionPurchaseService(walletStore, profileStore);
             profileStore = profile ?? new PlayerProfileStore();
             customizationService = new VisualCustomizationService(walletStore, inventoryStore);
             shopItems = new List<ShopItemDefinition>(ShopItemDefinition.CreateDefaults());
@@ -184,6 +184,9 @@ namespace CubeChallenge3D.UI.Shop
             statusText.gameObject.SetActive(false);
 
             promotionPurchaseService.StateChanged += HandlePromotionPurchaseStateChanged;
+            WalletStore.Changed += HandleExternalEconomyChanged;
+            InventoryStore.Changed += HandleExternalInventoryChanged;
+            PlayerProfileStore.Changed += HandleExternalProfileChanged;
 
             Hide();
         }
@@ -399,21 +402,30 @@ namespace CubeChallenge3D.UI.Shop
 
         private void Refresh(string message)
         {
+            inventoryStore.Reload();
+            profileStore.ReloadFromDisk();
+            Debug.Log("[Shop] Refresh item counts");
             statusText.text = string.Empty;
             statusText.gameObject.SetActive(false);
             UpdateViewportLayoutForCurrentTab();
             if (rewardService is RewardedAdService ads)
             {
+                ads.EnsureLoaded(RewardedAdPlacement.ShopCoinReward);
                 int remaining = ads.GetRemaining(RewardedAdPlacement.ShopCoinReward);
                 Text label = adRewardButton.GetComponentInChildren<Text>();
                 if (label != null)
                 {
                     label.fontSize = 20;
+                    bool ready = ads.IsReady(RewardedAdPlacement.ShopCoinReward);
                     label.text = ads.IsPlacementAvailable(RewardedAdPlacement.ShopCoinReward)
                         ? $"Watch Ad for +{ads.Config.dailyCoinRewardAmount} Coins  ({remaining}/{ads.Config.dailyCoinAdsMax} left)"
                         : "Ad not available";
+                    if (ads.IsPlacementAvailable(RewardedAdPlacement.ShopCoinReward) && !ready)
+                    {
+                        label.text = $"Loading Ad +{ads.Config.dailyCoinRewardAmount} Coins  ({remaining}/{ads.Config.dailyCoinAdsMax} left)";
+                    }
                 }
-                adRewardButton.interactable = ads.CanShow(RewardedAdPlacement.ShopCoinReward);
+                adRewardButton.interactable = ads.CanRequest(RewardedAdPlacement.ShopCoinReward);
             }
             else
             {
@@ -1798,16 +1810,67 @@ namespace CubeChallenge3D.UI.Shop
                 inventoryStore.Add(item.itemType, item.quantity);
             }
 
+            Debug.Log($"[Shop] Purchase success itemId={item.itemType} newCount={GetOwnedCount(item.itemType)}");
             Refresh(UIStrings.Purchased);
+        }
+
+        private void HandleExternalEconomyChanged()
+        {
+            if (root != null && root.activeInHierarchy)
+            {
+                Refresh(string.Empty);
+            }
+        }
+
+        private void HandleExternalInventoryChanged()
+        {
+            if (root != null && root.activeInHierarchy)
+            {
+                Refresh(string.Empty);
+            }
+        }
+
+        private void HandleExternalProfileChanged()
+        {
+            if (root != null && root.activeInHierarchy)
+            {
+                Refresh(string.Empty);
+            }
         }
 
         private void WatchAdForCoins()
         {
-            if (!rewardService.IsRewardAvailable(RewardType.EarnCoins))
+            if (rewardService is RewardedAdService ads)
             {
-                Refresh(rewardService is RewardedAdService ads
-                    ? ads.GetUnavailableMessage(RewardedAdPlacement.ShopCoinReward)
-                    : "Reward is not available.");
+                if (!ads.CanRequest(RewardedAdPlacement.ShopCoinReward))
+                {
+                    Refresh(ads.GetUnavailableMessage(RewardedAdPlacement.ShopCoinReward));
+                    return;
+                }
+
+                ads.Show(
+                    RewardedAdPlacement.ShopCoinReward,
+                    () =>
+                    {
+                        int reward = ads.Config.dailyCoinRewardAmount;
+                        int before = walletStore.Coins;
+                        walletStore.AddCoins(reward);
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+                        int after = walletStore.Coins;
+                        Debug.Log($"[ShopCoinAd] dailyCount={ads.DailyShopCoinAdsUsed}, reward={reward}, canWatch={ads.CanRequest(RewardedAdPlacement.ShopCoinReward)}");
+                        Debug.Log($"[AdRewardApplied] placement={RewardedAdPlacement.ShopCoinReward}, before={before}, after={after}");
+#endif
+                        Refresh($"{UIStrings.RewardClaimed} +{reward} Coins");
+                    },
+                    result =>
+                    {
+                        if (result == RewardedAdResult.Rewarded)
+                        {
+                            return;
+                        }
+
+                        Refresh(GetRewardedAdFailureMessage(result, RewardedAdPlacement.ShopCoinReward));
+                    });
                 return;
             }
 
@@ -1832,6 +1895,26 @@ namespace CubeChallenge3D.UI.Shop
 #endif
                 Refresh($"{UIStrings.RewardClaimed} +{reward} Coins");
             });
+        }
+
+        private string GetRewardedAdFailureMessage(RewardedAdResult result, RewardedAdPlacement placement)
+        {
+            switch (result)
+            {
+                case RewardedAdResult.NotReady:
+                    return "Ad is loading. Try again shortly.";
+                case RewardedAdResult.Closed:
+                    return UIStrings.AdNotCompleted;
+                case RewardedAdResult.LimitReached:
+                case RewardedAdResult.Unavailable:
+                    return rewardService is RewardedAdService ads
+                        ? ads.GetUnavailableMessage(placement)
+                        : "Reward is not available.";
+                case RewardedAdResult.Busy:
+                    return "Ad is already opening.";
+                default:
+                    return UIStrings.AdNotCompleted;
+            }
         }
 
         private static void AddDragBar(RectTransform parent)

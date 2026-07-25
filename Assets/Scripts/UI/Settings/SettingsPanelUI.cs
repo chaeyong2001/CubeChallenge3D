@@ -59,6 +59,18 @@ namespace CubeChallenge3D.UI.Settings
         private bool isSubmittingAvatar;
         private readonly NicknamePopupKeyboardGuard nicknameKeyboardGuard = new NicknamePopupKeyboardGuard();
 
+        private void OnEnable()
+        {
+            PlayerProfileStore.Changed += HandleProfileChanged;
+            PlayerProfileStore.NicknameTicketsChanged += HandleNicknameTicketsChanged;
+        }
+
+        private void OnDisable()
+        {
+            PlayerProfileStore.Changed -= HandleProfileChanged;
+            PlayerProfileStore.NicknameTicketsChanged -= HandleNicknameTicketsChanged;
+        }
+
         public void Initialize(
             SettingsStore store,
             CubeControlModeController controlController,
@@ -711,6 +723,7 @@ namespace CubeChallenge3D.UI.Settings
         private async void ConnectGooglePlay()
         {
             Debug.Log("[GPGS] Manual connect clicked.");
+            Debug.Log("[Profile] Settings Google Play connect start");
             PlayerProfile profile = profileStore.Current;
             if (profile == null)
             {
@@ -731,7 +744,58 @@ namespace CubeChallenge3D.UI.Settings
             }
 
             Debug.Log($"[GPGS] Manual sign-in success playerId={MaskId(result.providerUserId)}");
-            Debug.Log($"[Profile] Link Google Play start profileId={profile.profileId}");
+            Debug.Log("[Profile] Resolve before link start");
+            GooglePlayProfileResolveResult resolve = await profileApiClient.ResolveGooglePlayProfileAsync(result.providerUserId);
+            if (!resolve.success)
+            {
+                string message = string.IsNullOrWhiteSpace(resolve.message)
+                    ? "Could not check Google Play profile."
+                    : resolve.message;
+                Debug.LogWarning($"[Profile] Resolve before link failed status={resolve.statusCode} message={message}");
+                profileStore.UpdateGooglePlayLink(string.Empty, message);
+                SetMessage(message);
+                RefreshLabels();
+                return;
+            }
+
+            if (resolve.found && resolve.profile != null)
+            {
+                Debug.Log($"[Profile] Resolve before link found serverProfileId={MaskId(resolve.profile.profileId)} serverNickname={resolve.profile.nickname} currentProfileId={MaskId(profile.profileId)} currentNickname={profile.nickname}");
+                if (resolve.profile.profileId == profile.profileId)
+                {
+                    Debug.Log("[Profile] Existing Google profile is same profile. Refresh link.");
+                    Debug.Log($"[Profile] ProfileId compare result=same profileId={MaskId(profile.profileId)}");
+                    string resolvedGooglePlayId = FirstNonEmpty(
+                        resolve.profile.googlePlayGamesPlayerId,
+                        resolve.profile.googlePlayPlayerId,
+                        result.providerUserId);
+                    profileStore.UpdateGooglePlayLink(resolvedGooglePlayId, result.displayName, string.Empty);
+                    SetMessage(T("google_play_connected"));
+                    RefreshLabels();
+                    return;
+                }
+
+                Debug.LogWarning("[Profile] Existing Google profile conflict.");
+                Debug.LogWarning($"[Profile] ProfileId compare result=conflict serverProfileId={MaskId(resolve.profile.profileId)} currentProfileId={MaskId(profile.profileId)}");
+                Debug.LogWarning($"[Profile] Google profile nickname={resolve.profile.nickname}");
+                Debug.LogWarning($"[Profile] Current local nickname={profile.nickname}");
+                Debug.LogWarning("[Profile] Do not overwrite automatically.");
+                string conflictMessage = "This Google Play Games account is already linked to another profile.";
+                if (!string.IsNullOrWhiteSpace(resolve.profile.nickname) || !string.IsNullOrWhiteSpace(profile.nickname))
+                {
+                    conflictMessage += $"\nGoogle profile: {FirstNonEmpty(resolve.profile.nickname, "Unknown")}";
+                    conflictMessage += $"\nCurrent profile: {FirstNonEmpty(profile.nickname, "Unknown")}";
+                }
+
+                profileStore.UpdateGooglePlayLink(string.Empty, conflictMessage);
+                SetMessage(conflictMessage);
+                RefreshLabels();
+                return;
+            }
+
+            Debug.Log("[Profile] No existing Google profile. Link current local profile.");
+            Debug.Log($"[Profile] ProfileId compare result=no-server-profile currentProfileId={MaskId(profile.profileId)} currentNickname={profile.nickname}");
+            Debug.Log($"[Profile] Link Google Play start profileId={MaskId(profile.profileId)}");
             GooglePlayProfileLinkResult link = await profileApiClient.LinkGooglePlayAsync(
                 profile.profileId,
                 result.providerUserId,
@@ -758,6 +822,7 @@ namespace CubeChallenge3D.UI.Settings
             }
 
             Debug.Log("[Profile] Link Google Play success");
+            Debug.Log($"[Profile] ProfileId compare result=linked serverProfileId={MaskId(link.profile?.profileId)} currentProfileId={MaskId(profile.profileId)}");
             string linkedGooglePlayId = FirstNonEmpty(
                 link.profile?.googlePlayGamesPlayerId,
                 link.profile?.googlePlayPlayerId,
@@ -787,11 +852,7 @@ namespace CubeChallenge3D.UI.Settings
         {
             PlayerProfile profile = profileStore.Current;
             nicknameInput.text = profile != null ? profile.nickname : string.Empty;
-            int tickets = profile != null ? Mathf.Max(0, profile.nicknameChangeTickets) : 0;
-            nicknamePopupMessage.text = profile != null
-                ? string.Format(T("tickets_available"), tickets)
-                : T("create_profile_first");
-            SetNicknameOkInteractable(profile != null && tickets > 0);
+            RefreshNicknameTicketState();
             nicknameKeyboardGuard.ResetToCurrentText();
             nicknamePopupRoot.SetActive(true);
             nicknameInput.Select();
@@ -803,6 +864,42 @@ namespace CubeChallenge3D.UI.Settings
             nicknameKeyboardGuard.CommitLatestKeyboardText();
             nicknamePopupRoot.SetActive(false);
             isSubmittingNickname = false;
+        }
+
+        private void HandleProfileChanged()
+        {
+            RefreshNicknameTicketState();
+        }
+
+        private void HandleNicknameTicketsChanged(int count)
+        {
+            RefreshNicknameTicketState();
+        }
+
+        private void RefreshNicknameTicketState()
+        {
+            if (profileStore == null)
+            {
+                return;
+            }
+
+            profileStore.ReloadFromDisk();
+            PlayerProfile profile = profileStore.Current;
+            int tickets = profile != null ? Mathf.Max(0, profile.nicknameChangeTickets) : 0;
+            Debug.Log($"[Settings] Refresh nickname ticket state count={tickets}");
+
+            if (nicknamePopupMessage != null)
+            {
+                nicknamePopupMessage.text = profile != null
+                    ? string.Format(T("tickets_available"), tickets)
+                    : T("create_profile_first");
+            }
+
+            SetNicknameOkInteractable(profile != null && tickets > 0);
+            if (root != null && root.activeInHierarchy)
+            {
+                RefreshLabels();
+            }
         }
 
         private void ShowAvatarPopup()

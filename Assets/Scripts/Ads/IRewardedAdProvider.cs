@@ -6,6 +6,7 @@ namespace CubeChallenge3D.Ads
     {
         bool IsAvailable(RewardedAdPlacement placement);
         bool IsReady(RewardedAdPlacement placement);
+        void LoadRewardedAd(RewardedAdPlacement placement);
         void ShowRewardedAd(
             RewardedAdPlacement placement,
             Action onRewarded,

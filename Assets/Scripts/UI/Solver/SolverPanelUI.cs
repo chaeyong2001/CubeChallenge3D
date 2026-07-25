@@ -394,6 +394,7 @@ namespace CubeChallenge3D.UI.Solver
 
             ApplyManualSolverLayout();
             playbackPanel = new SolverPlaybackPanelUI(contentPanelRect, ExitPlaybackMode);
+            InventoryStore.Changed += RefreshInventoryState;
             Hide();
         }
 
@@ -410,6 +411,7 @@ namespace CubeChallenge3D.UI.Solver
             ResetFaceNavigator();
             ExitPlaybackMode();
             inventoryStore.Reload();
+            RefreshInventoryState();
             SetLearnMode(false);
         }
 
@@ -906,6 +908,7 @@ namespace CubeChallenge3D.UI.Solver
 
         private void UpdateGuidanceButtons()
         {
+            RefreshSolverTicketCount();
             if (validateButton != null)
             {
                 validateButton.interactable = true;
@@ -988,6 +991,22 @@ namespace CubeChallenge3D.UI.Solver
             if (play3DButton != null && play3DButton.interactable)
             {
                 StartPulse(play3DButton);
+            }
+        }
+
+        private void RefreshInventoryState()
+        {
+            inventoryStore.Reload();
+            RefreshSolverTicketCount();
+            Debug.Log($"[ManualSolver] Refresh inventory state");
+            Debug.Log($"[ManualSolver] Refresh ticket state count={inventoryStore.SolverTickets}");
+        }
+
+        private void RefreshSolverTicketCount()
+        {
+            if (solverTicketCountText != null)
+            {
+                solverTicketCountText.text = string.Format(T("solve_count"), inventoryStore.SolverTickets);
             }
         }
 

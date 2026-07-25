@@ -365,6 +365,12 @@ namespace CubeChallenge3D.GameModes.RankingChallenge
                 ? profile.profileId
                 : settingsStore?.Current?.playerId ?? "local";
             int avatarId = profile != null ? profile.avatarId : -1;
+            bool profileIdMatchesActive = profile == null || profile.profileId == playerId;
+            bool nicknameMatchesActive = profile == null || profile.nickname == playerName;
+            Debug.Log(
+                $"[Ranking] Active profile profileId={MaskId(profile?.profileId)} nickname={profile?.nickname ?? "(none)"} linkedGooglePlay={profile?.linkedGooglePlay.ToString() ?? "false"} googlePlayGamesPlayerId={MaskId(profile?.googlePlayPlayerId)}");
+            Debug.Log(
+                $"[Ranking] Submit uses profileId={MaskId(playerId)} nickname={playerName} activeProfileIdMatch={profileIdMatchesActive} activeNicknameMatch={nicknameMatchesActive}");
             RankingSubmission submission = RankingSubmission.Create(
                 config.challengeId,
                 playerId,
@@ -388,6 +394,8 @@ namespace CubeChallenge3D.GameModes.RankingChallenge
             RankingSubmitResult submitResult = await rankingService.SubmitAsync(submission);
             latestSubmittedRecord = submitResult?.submission ?? submission;
             lastSubmitMessage = submitResult.message;
+            Debug.Log(
+                $"[Ranking] Submit result success={submitResult?.success.ToString() ?? "false"} rejected={submitResult?.isRejected.ToString() ?? "false"} message={submitResult?.message ?? string.Empty} profileId={MaskId(latestSubmittedRecord?.playerId)} nickname={latestSubmittedRecord?.playerName}");
             await RefreshRankingsAsync();
         }
 
@@ -481,6 +489,22 @@ namespace CubeChallenge3D.GameModes.RankingChallenge
             }
 
             return "Local Ranking";
+        }
+
+        private static string MaskId(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return "(empty)";
+            }
+
+            string trimmed = value.Trim();
+            if (trimmed.Length <= 6)
+            {
+                return "***";
+            }
+
+            return $"{trimmed.Substring(0, 3)}***{trimmed.Substring(trimmed.Length - 3)}";
         }
     }
 }

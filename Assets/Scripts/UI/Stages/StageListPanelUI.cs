@@ -3275,6 +3275,7 @@ namespace CubeChallenge3D.UI.Stages
                 return;
             }
 
+            rewardService?.EnsureLoaded(RewardedAdPlacement.HeartPlus1);
             bool canWatch = CanWatchRewardedHeartAd(hearts, out string reason, out string buttonText, out string statusText);
             heartAdButton.interactable = canWatch;
             SetButtonLabel(heartAdButton, buttonText);
@@ -3316,17 +3317,20 @@ namespace CubeChallenge3D.UI.Stages
                 return false;
             }
 
-            if (!IsRewardedHeartAdReady())
+            if (!IsRewardedHeartAdAvailable())
             {
-                reason = "ad_not_ready";
-                buttonText = "Ad not ready";
-                statusText = "Ad is not ready. Try again later.";
+                reason = "ad_unavailable";
+                buttonText = "Ad not available";
+                statusText = "Ads are not available yet.";
                 return false;
             }
 
-            reason = "ready";
-            buttonText = "Watch Ad +1 Heart";
-            statusText = $"Ad hearts today: {adsRewardLimitStore.DailyHeartAdTotalCount}/{HeartAdDailyLimit}  Batch: {adsRewardLimitStore.HeartAdBatchCount}/{HeartAdBatchLimit}";
+            bool ready = IsRewardedHeartAdReady();
+            reason = ready ? "ready" : "ad_loading";
+            buttonText = ready ? "Watch Ad +1 Heart" : "Loading Ad +1 Heart";
+            statusText = ready
+                ? $"Ad hearts today: {adsRewardLimitStore.DailyHeartAdTotalCount}/{HeartAdDailyLimit}  Batch: {adsRewardLimitStore.HeartAdBatchCount}/{HeartAdBatchLimit}"
+                : "Ad is loading. Try again shortly.";
             return true;
         }
 
@@ -3352,7 +3356,7 @@ namespace CubeChallenge3D.UI.Stages
                 {
                     if (result != RewardedAdResult.Rewarded)
                     {
-                        OnRewardedHeartAdFailedOrCancelled();
+                        OnRewardedHeartAdFailedOrCancelled(result);
                     }
                 });
         }
@@ -3360,7 +3364,7 @@ namespace CubeChallenge3D.UI.Stages
         private void OnRewardedHeartAdCompleted()
         {
             int heartsBefore = walletStore.Hearts;
-            if (!CanWatchRewardedHeartAd(heartsBefore, out _, out _, out _))
+            if (!CanReceiveHeartAdReward(heartsBefore))
             {
                 RefreshHeartPopupContent();
                 return;
@@ -3376,19 +3380,33 @@ namespace CubeChallenge3D.UI.Stages
             RefreshHeartPopupContent();
         }
 
-        private void OnRewardedHeartAdFailedOrCancelled()
+        private void OnRewardedHeartAdFailedOrCancelled(RewardedAdResult result = RewardedAdResult.Failed)
         {
             if (heartAdStatusText != null)
             {
-                heartAdStatusText.text = "Ad was not completed.";
+                heartAdStatusText.text = result == RewardedAdResult.NotReady
+                    ? "Ad is loading. Try again shortly."
+                    : "Ad was not completed.";
             }
 
             RefreshHeartPopupContent();
         }
 
+        private bool IsRewardedHeartAdAvailable()
+        {
+            return rewardService != null && rewardService.IsPlacementAvailable(RewardedAdPlacement.HeartPlus1);
+        }
+
         private bool IsRewardedHeartAdReady()
         {
             return rewardService != null && rewardService.CanShow(RewardedAdPlacement.HeartPlus1);
+        }
+
+        private bool CanReceiveHeartAdReward(int hearts)
+        {
+            return hearts < WalletStore.MaxNaturalHearts
+                && adsRewardLimitStore.DailyHeartAdTotalCount < HeartAdDailyLimit
+                && adsRewardLimitStore.HeartAdBatchCount < HeartAdBatchLimit;
         }
 
         private void StartHeartPopupCountdown()

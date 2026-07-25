@@ -18,6 +18,11 @@ class Settings:
     scramble_length = 20
     cors_origins = os.getenv("CORS_ORIGINS", "*")
     database_url = os.getenv("DATABASE_URL", "sqlite:///./ranking_dev.db")
+    google_play_package_name = os.getenv("GOOGLE_PLAY_PACKAGE_NAME", "com.FAMLEE.CubeChallenge3D")
+    google_play_service_account_json = os.getenv("GOOGLE_PLAY_SERVICE_ACCOUNT_JSON", "")
+    google_play_service_account_file = os.getenv("GOOGLE_PLAY_SERVICE_ACCOUNT_FILE", "")
+    iap_admin_secret = os.getenv("IAP_ADMIN_SECRET", "")
+    google_play_voided_sync_enabled = os.getenv("GOOGLE_PLAY_VOIDED_SYNC_ENABLED", "false").lower() == "true"
 
     @property
     def sqlalchemy_database_url(self) -> str:

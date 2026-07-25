@@ -16,6 +16,10 @@ namespace CubeChallenge3D.Ads
             return true;
         }
 
+        public void LoadRewardedAd(RewardedAdPlacement placement)
+        {
+        }
+
         public void ShowRewardedAd(
             RewardedAdPlacement placement,
             Action onRewarded,

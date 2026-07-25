@@ -67,6 +67,9 @@ namespace CubeChallenge3D.UI.Records
 
         private readonly GameObject root;
         private readonly RectTransform rowsContent;
+        private readonly ScrollRect rowsScrollRect;
+        private readonly VerticalLayoutGroup rowsLayout;
+        private readonly RectTransform stickyRow;
         private readonly Text emptyText;
         private readonly Text statusText;
         private readonly Text localSummaryText;
@@ -77,9 +80,11 @@ namespace CubeChallenge3D.UI.Records
         private readonly StageProgressStore progressStore = new StageProgressStore();
         private readonly PlayerProfileStore profileStore = new PlayerProfileStore();
         private readonly StageProgressRecordsApiClient recordsApiClient;
+        private readonly Dictionary<string, RectTransform> rowsByPlayerId = new Dictionary<string, RectTransform>();
 
         private RecordsMode selectedMode = RecordsMode.Normal;
         private int refreshRequestId;
+        private string stickyPlayerId = string.Empty;
 
         public RecordsPanelUI(Transform parent)
         {
@@ -105,7 +110,9 @@ namespace CubeChallenge3D.UI.Records
             infinityTab.onClick.AddListener(() => SelectMode(RecordsMode.Infinity));
 
             CreateColumnHeader(panel);
-            rowsContent = CreateRowsArea(panel);
+            rowsContent = CreateRowsArea(panel, out rowsScrollRect, out rowsLayout);
+            stickyRow = CreateStickyRow(panel);
+            stickyRow.gameObject.SetActive(false);
 
             emptyText = RuntimeUiFactory.CreateText(panel, "EmptyText", T("no_world_records"), 34, TextAnchor.MiddleCenter);
             emptyText.fontStyle = FontStyle.Bold;
@@ -160,7 +167,7 @@ namespace CubeChallenge3D.UI.Records
             string initialStatus = recordsApiClient != null && recordsApiClient.HasServerUrl
                 ? $"Loading World Records - {GetModeName(selectedMode)}"
                 : $"Local Progress - {GetModeName(selectedMode)}";
-            RenderRecords(records, progress, initialStatus);
+            RenderRecords(records, progress, initialStatus, FindLocalRecord(records));
             _ = RefreshServerRecordsAsync(selectedMode, progress, ++refreshRequestId);
         }
 
@@ -172,6 +179,7 @@ namespace CubeChallenge3D.UI.Records
             }
 
             PlayerProfile profile = profileStore.Current;
+            StageProgressRecordsResult submittedRank = null;
             if (profile != null
                 && !string.IsNullOrWhiteSpace(profile.profileId)
                 && (progress.clearedStage > 0 || progress.totalStars > 0))
@@ -186,10 +194,13 @@ namespace CubeChallenge3D.UI.Records
                     totalStars = progress.totalStars,
                     clientUpdatedAtUtc = DateTime.UtcNow.ToString("o")
                 };
-                await recordsApiClient.SubmitAsync(payload);
+                submittedRank = await recordsApiClient.SubmitAsync(payload);
             }
 
             StageProgressRecordsResult result = await recordsApiClient.GetLeaderboardAsync(GetApiMode(mode), 50);
+            StageProgressRecordsResult myRank = profile != null && !string.IsNullOrWhiteSpace(profile.profileId)
+                ? await recordsApiClient.GetMyRankAsync(GetApiMode(mode), profile.profileId)
+                : null;
             if (requestId != refreshRequestId || selectedMode != mode)
             {
                 return;
@@ -202,7 +213,8 @@ namespace CubeChallenge3D.UI.Records
                 RenderRecords(
                     fallback,
                     progress,
-                    fallback.Count > 0 ? "Server unavailable - Showing local records" : "Server unavailable. Try again later");
+                    fallback.Count > 0 ? "Server unavailable - Showing local records" : "Server unavailable. Try again later",
+                    FindLocalRecord(fallback));
                 return;
             }
 
@@ -224,20 +236,30 @@ namespace CubeChallenge3D.UI.Records
                 .ToList();
 
             ApplyCompetitionRanks(serverRecords);
-            RenderRecords(serverRecords, progress, $"Server Ranking - {GetModeName(mode)}");
+            ProgressRecord stickyRecord = ConvertFirstServerRecord(myRank, profile)
+                ?? ConvertFirstServerRecord(submittedRank, profile)
+                ?? FindLocalRecord(serverRecords);
+            RenderRecords(serverRecords, progress, $"Server Ranking - {GetModeName(mode)}", stickyRecord);
         }
 
-        private void RenderRecords(List<ProgressRecord> records, ModeProgress progress, string statusPrefix)
+        private void RenderRecords(List<ProgressRecord> records, ModeProgress progress, string statusPrefix, ProgressRecord stickyRecord)
         {
             ClearRows();
 
             int visibleCount = Math.Min(50, records.Count);
             for (int i = 0; i < visibleCount; i++)
             {
-                CreateRecordRow(rowsContent, records[i], i);
+                RectTransform row = CreateRecordRow(rowsContent, records[i], i);
+                if (!string.IsNullOrWhiteSpace(records[i]?.playerId))
+                {
+                    rowsByPlayerId[records[i].playerId] = row;
+                }
             }
 
-            emptyText.gameObject.SetActive(records.Count == 0);
+            SetStickyRow(stickyRecord);
+            Canvas.ForceUpdateCanvases();
+            UpdateStickyVisibility();
+            emptyText.gameObject.SetActive(records.Count == 0 && stickyRecord == null);
             statusText.text = string.Empty;
             localSummaryText.text = string.Empty;
         }
@@ -298,6 +320,32 @@ namespace CubeChallenge3D.UI.Records
                 .ThenByDescending(record => record.totalStars)
                 .ThenBy(record => record.playerName, StringComparer.OrdinalIgnoreCase)
                 .ToList();
+        }
+
+        private static ProgressRecord ConvertFirstServerRecord(StageProgressRecordsResult result, PlayerProfile profile)
+        {
+            StageProgressRecordDto dto = result?.records?.FirstOrDefault();
+            if (dto == null)
+            {
+                return null;
+            }
+
+            return new ProgressRecord
+            {
+                rank = dto.rank,
+                firstInRankGroup = !dto.tied,
+                playerId = dto.playerId,
+                playerName = string.IsNullOrWhiteSpace(dto.nickname) ? "Player" : dto.nickname,
+                avatarId = Mathf.Clamp(dto.profileImageId, 0, 3),
+                clearedStage = dto.clearedStage,
+                totalStars = dto.totalStars,
+                isLocalPlayer = profile != null && dto.playerId == profile.profileId
+            };
+        }
+
+        private static ProgressRecord FindLocalRecord(List<ProgressRecord> records)
+        {
+            return records?.FirstOrDefault(record => record != null && record.isLocalPlayer);
         }
 
         private static void ApplyCompetitionRanks(List<ProgressRecord> records)
@@ -453,7 +501,7 @@ namespace CubeChallenge3D.UI.Records
             CreateHeaderText(header, "StarsHeader", T("stars"), 28, 744f, 0f, 170f, TextAnchor.MiddleCenter);
         }
 
-        private static RectTransform CreateRowsArea(RectTransform parent)
+        private RectTransform CreateRowsArea(RectTransform parent, out ScrollRect scroll, out VerticalLayoutGroup layout)
         {
             GameObject scrollObject = new GameObject("WorldRecordsRows", typeof(RectTransform), typeof(Image), typeof(ScrollRect));
             scrollObject.transform.SetParent(parent, false);
@@ -462,7 +510,7 @@ namespace CubeChallenge3D.UI.Records
             rect.anchorMax = new Vector2(0.5f, 1f);
             rect.pivot = new Vector2(0.5f, 1f);
             rect.anchoredPosition = new Vector2(0f, -198f);
-            rect.sizeDelta = new Vector2(940f, 996f);
+            rect.sizeDelta = new Vector2(940f, 1038f);
 
             Image image = scrollObject.GetComponent<Image>();
             CasualUIStyle.ApplyPanel(image, InnerPanelColor, 26);
@@ -492,7 +540,7 @@ namespace CubeChallenge3D.UI.Records
             content.offsetMin = Vector2.zero;
             content.offsetMax = Vector2.zero;
 
-            VerticalLayoutGroup layout = contentObject.GetComponent<VerticalLayoutGroup>();
+            layout = contentObject.GetComponent<VerticalLayoutGroup>();
             layout.spacing = 10f;
             layout.padding = new RectOffset(0, 0, 0, 0);
             layout.childControlWidth = true;
@@ -503,17 +551,35 @@ namespace CubeChallenge3D.UI.Records
             ContentSizeFitter fitter = contentObject.GetComponent<ContentSizeFitter>();
             fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
-            ScrollRect scroll = scrollObject.GetComponent<ScrollRect>();
+            scroll = scrollObject.GetComponent<ScrollRect>();
             scroll.viewport = viewport;
             scroll.content = content;
             scroll.horizontal = false;
             scroll.vertical = true;
             scroll.movementType = ScrollRect.MovementType.Clamped;
             scroll.scrollSensitivity = 38f;
+            scroll.onValueChanged.AddListener(_ => UpdateStickyVisibility());
             return content;
         }
 
-        private static void CreateRecordRow(RectTransform parent, ProgressRecord record, int rowIndex)
+        private static RectTransform CreateStickyRow(RectTransform panel)
+        {
+            RectTransform row = CasualUIFactory.CreatePanel(panel, "LocalRecordStickyRow", new Color32(0x08, 0x30, 0x56, 0xFC), 18);
+            row.anchorMin = new Vector2(0.5f, 0f);
+            row.anchorMax = new Vector2(0.5f, 0f);
+            row.pivot = new Vector2(0.5f, 0f);
+            row.anchoredPosition = new Vector2(0f, 32f);
+            row.sizeDelta = new Vector2(940f, 108f);
+            Outline outline = row.gameObject.AddComponent<Outline>();
+            outline.effectColor = new Color32(0xFF, 0xD1, 0x5A, 0xE6);
+            outline.effectDistance = new Vector2(3f, -3f);
+            Shadow shadow = row.gameObject.AddComponent<Shadow>();
+            shadow.effectColor = new Color32(0xE3, 0xA2, 0x1A, 0x55);
+            shadow.effectDistance = new Vector2(0f, -6f);
+            return row;
+        }
+
+        private static RectTransform CreateRecordRow(RectTransform parent, ProgressRecord record, int rowIndex)
         {
             GameObject rowObject = new GameObject($"RecordRow{rowIndex + 1}", typeof(RectTransform), typeof(Image));
             rowObject.transform.SetParent(parent, false);
@@ -541,6 +607,7 @@ namespace CubeChallenge3D.UI.Records
             CreateValueText(row, "Player", record.playerName, 31, 252f, 0f, 300f, TextAnchor.MiddleLeft, Color.white, true);
             CreateValueText(row, "Stage", record.clearedStage.ToString(), 36, 590f, 0f, 140f, TextAnchor.MiddleCenter, GoldColor, true);
             CreateStarValue(row, record.totalStars);
+            return row;
         }
 
         private static void CreateRank(RectTransform row, ProgressRecord record)
@@ -665,6 +732,89 @@ namespace CubeChallenge3D.UI.Records
             {
                 UnityEngine.Object.Destroy(rowsContent.GetChild(i).gameObject);
             }
+
+            rowsByPlayerId.Clear();
+        }
+
+        private void SetStickyRow(ProgressRecord record)
+        {
+            if (stickyRow == null)
+            {
+                return;
+            }
+
+            for (int i = stickyRow.childCount - 1; i >= 0; i--)
+            {
+                UnityEngine.Object.Destroy(stickyRow.GetChild(i).gameObject);
+            }
+
+            bool hasRecord = record != null && record.rank > 0 && !string.IsNullOrWhiteSpace(record.playerId);
+            stickyPlayerId = hasRecord ? record.playerId : string.Empty;
+            stickyRow.gameObject.SetActive(hasRecord);
+            SetRowsBottomPadding(hasRecord ? 128 : 0);
+            if (!hasRecord)
+            {
+                return;
+            }
+
+            RectTransform labelPanel = CasualUIFactory.CreatePanel(stickyRow, "StickyLabelPanel", new Color32(0x03, 0x18, 0x31, 0xF2), 14);
+            labelPanel.anchorMin = new Vector2(0.014f, 0.140f);
+            labelPanel.anchorMax = new Vector2(0.205f, 0.860f);
+            labelPanel.offsetMin = Vector2.zero;
+            labelPanel.offsetMax = Vector2.zero;
+
+            Text prefix = RuntimeUiFactory.CreateText(labelPanel, "StickyPrefix", "Your record", 20, TextAnchor.MiddleCenter);
+            prefix.rectTransform.anchorMin = Vector2.zero;
+            prefix.rectTransform.anchorMax = Vector2.one;
+            prefix.rectTransform.offsetMin = Vector2.zero;
+            prefix.rectTransform.offsetMax = Vector2.zero;
+            prefix.color = GoldHighlightColor;
+            prefix.fontStyle = FontStyle.Bold;
+            CasualUIStyle.ApplyTextDepth(prefix, true);
+
+            Text rank = CreateValueText(stickyRow, "StickyRank", FormatRank(record.rank), 28, 220f, 0f, 112f, TextAnchor.MiddleCenter, GoldHighlightColor, true);
+            rank.fontStyle = FontStyle.Bold;
+            CreateValueText(stickyRow, "StickyPlayer", record.playerName, 28, 350f, 0f, 210f, TextAnchor.MiddleLeft, Color.white, true);
+            CreateValueText(stickyRow, "StickyStage", record.clearedStage.ToString(), 34, 590f, 0f, 140f, TextAnchor.MiddleCenter, GoldColor, true);
+            CreateStarValue(stickyRow, record.totalStars);
+        }
+
+        private void SetRowsBottomPadding(int bottomPadding)
+        {
+            if (rowsLayout != null)
+            {
+                rowsLayout.padding = new RectOffset(0, 0, 0, bottomPadding);
+            }
+        }
+
+        private void UpdateStickyVisibility()
+        {
+            if (stickyRow == null || string.IsNullOrWhiteSpace(stickyPlayerId))
+            {
+                return;
+            }
+
+            if (!rowsByPlayerId.TryGetValue(stickyPlayerId, out RectTransform row))
+            {
+                stickyRow.gameObject.SetActive(true);
+                return;
+            }
+
+            stickyRow.gameObject.SetActive(!IsRowVisibleInViewport(row));
+        }
+
+        private bool IsRowVisibleInViewport(RectTransform row)
+        {
+            if (row == null || rowsScrollRect == null || rowsScrollRect.viewport == null)
+            {
+                return false;
+            }
+
+            Vector3[] rowCorners = new Vector3[4];
+            Vector3[] viewportCorners = new Vector3[4];
+            row.GetWorldCorners(rowCorners);
+            rowsScrollRect.viewport.GetWorldCorners(viewportCorners);
+            return rowCorners[1].y <= viewportCorners[1].y && rowCorners[0].y >= viewportCorners[0].y;
         }
 
         private static void SetTabVisual(Button button, bool selected)
@@ -768,6 +918,11 @@ namespace CubeChallenge3D.UI.Records
 
         private static string FormatRank(int rank)
         {
+            if (rank > 999)
+            {
+                return "???";
+            }
+
             switch (rank)
             {
                 case 1: return "1";

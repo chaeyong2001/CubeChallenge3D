@@ -121,6 +121,7 @@ class PlayerProfileCreateRequest(BaseModel):
     nickname: str = Field(..., min_length=1, max_length=40)
     avatarId: int = Field(..., ge=0, le=3)
     googlePlayPlayerId: Optional[str] = None
+    googlePlayGamesPlayerId: Optional[str] = None
     googleAccountId: Optional[str] = None
     googleEmailHash: Optional[str] = None
 
@@ -133,6 +134,7 @@ class PlayerProfileResponse(BaseModel):
     updatedAt: str
     linkedGooglePlay: bool
     linkedGoogle: bool
+    googlePlayPlayerId: Optional[str] = None
     googlePlayGamesPlayerId: Optional[str] = None
 
 
@@ -250,3 +252,59 @@ class StageProgressMyRankResponse(BaseModel):
     success: bool
     message: str
     record: Optional[StageProgressRecordResponse] = None
+
+
+class IapGoogleVerifyRequest(BaseModel):
+    profileId: str = Field(..., min_length=1, max_length=120)
+    productId: str = Field(..., min_length=1, max_length=120)
+    purchaseToken: str = Field(..., min_length=1)
+    orderId: Optional[str] = Field(None, max_length=160)
+    packageName: str = Field("com.FAMLEE.CubeChallenge3D", min_length=1, max_length=160)
+
+
+class IapGoogleRestorePurchase(BaseModel):
+    productId: str = Field(..., min_length=1, max_length=120)
+    purchaseToken: str = Field(..., min_length=1)
+    orderId: Optional[str] = Field(None, max_length=160)
+
+
+class IapGoogleRestoreRequest(BaseModel):
+    profileId: str = Field(..., min_length=1, max_length=120)
+    purchases: List[IapGoogleRestorePurchase] = []
+
+
+class IapVoidedPurchasesSyncRequest(BaseModel):
+    adminSecret: str = ""
+
+
+class IapProfileStateResponse(BaseModel):
+    profileId: str
+    gems: int = 0
+    coins: int = 0
+    removeAdsPurchased: bool = False
+    refundDebtGems: int = 0
+
+
+class IapPurchaseResponse(BaseModel):
+    productId: str
+    status: str
+    productType: str = ""
+    grantedCurrencyType: Optional[str] = None
+    grantedAmount: int = 0
+
+
+class IapGoogleVerifyResponse(BaseModel):
+    success: bool
+    alreadyGranted: bool = False
+    profile: Optional[IapProfileStateResponse] = None
+    purchase: Optional[IapPurchaseResponse] = None
+    errorCode: Optional[str] = None
+    message: str = ""
+
+
+class IapVoidedPurchasesSyncResponse(BaseModel):
+    success: bool
+    scanned: int = 0
+    revoked: int = 0
+    skipped: int = 0
+    message: str = ""

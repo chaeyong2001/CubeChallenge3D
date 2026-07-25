@@ -82,35 +82,61 @@ namespace CubeChallenge3D.UI
             PlayerProfileApiClient profileApiClient = new PlayerProfileApiClient(
                 settingsStore.Current.rankingApiBaseUrl,
                 settingsStore.Current.rankingRequestTimeoutSeconds);
+            AccountChoicePanelUI accountChoice = null;
             ProfileSetupPanelUI profileSetup = null;
             profileSetup = new ProfileSetupPanelUI(menuPanel, profileStore, profileApiClient, _ =>
             {
                 profileStore.SyncAppSettings(settingsStore);
+                accountChoice?.SetVisible(false);
                 profileSetup.SetVisible(false);
                 layout.gameObject.SetActive(true);
             });
+            accountChoice = new AccountChoicePanelUI(
+                menuPanel,
+                () =>
+                {
+                    _ = SignInAndResolveGooglePlayProfileAsync(
+                        profileStore,
+                        settingsStore,
+                        profileApiClient,
+                        profileSetup,
+                        accountChoice,
+                        layout);
+                },
+                () =>
+                {
+                    Debug.Log("[ProfileFlow] Continue without sign-in selected");
+                    Debug.Log("[ProfileFlow] Show guest nickname setup");
+                    profileSetup.SetGooglePlayContext(string.Empty, string.Empty);
+                    accountChoice.SetVisible(false);
+                    layout.gameObject.SetActive(false);
+                    profileSetup.SetVisible(true);
+                });
             bool hasProfile = profileStore.Exists();
             if (hasProfile)
             {
                 profileStore.SyncAppSettings(settingsStore);
                 PlayerProfile profile = profileStore.Current;
+                if (profile != null && (profile.linkedGooglePlay || !string.IsNullOrWhiteSpace(profile.googlePlayPlayerId)))
+                {
+                    Debug.Log("[GPGS] Linked profile found. Try silent sign-in.");
+                    _ = RefreshLinkedGooglePlayProfileAsync(profileStore, settingsStore, profileApiClient);
+                }
+
+                Debug.Log("[ProfileFlow] Local profile found. Skip account choice.");
                 Debug.Log($"[MainMenu] Profile exists. Showing menu buttons. nickname={profile?.nickname} avatarId={profile?.avatarId}");
             }
             else
             {
-                Debug.Log("[MainMenu] No profile. Showing profile setup.");
+                Debug.Log("[ProfileFlow] No local profile found. Show account choice.");
             }
 
             layout.gameObject.SetActive(hasProfile);
             profileSetup.SetVisible(false);
+            accountChoice.SetVisible(!hasProfile);
             if (!hasProfile)
             {
-                _ = TryRestoreGooglePlayProfileAsync(
-                    profileStore,
-                    settingsStore,
-                    profileApiClient,
-                    profileSetup,
-                    layout);
+                accountChoice.SetMessage(string.Empty);
             }
 
             WalletStore walletStore = new WalletStore();
@@ -526,68 +552,80 @@ namespace CubeChallenge3D.UI
             binding.Initialize(settingsStore, profileStore);
         }
 
-        private static async Task TryRestoreGooglePlayProfileAsync(
+        private static async Task SignInAndResolveGooglePlayProfileAsync(
             PlayerProfileStore profileStore,
             SettingsStore settingsStore,
             PlayerProfileApiClient profileApiClient,
             ProfileSetupPanelUI profileSetup,
+            AccountChoicePanelUI accountChoice,
             VerticalLayoutGroup layout)
         {
-            if (profileStore == null || settingsStore == null || profileSetup == null || layout == null)
+            if (profileStore == null || settingsStore == null || profileSetup == null || accountChoice == null || layout == null)
             {
                 return;
             }
 
             if (profileStore.Exists())
             {
+                Debug.Log("[ProfileFlow] Local profile found during sign-in flow. Skip account choice.");
                 profileStore.SyncAppSettings(settingsStore);
                 layout.gameObject.SetActive(true);
+                accountChoice.SetVisible(false);
                 profileSetup.SetVisible(false);
                 return;
             }
 
-            AccountLinkState auth = await new GooglePlayGamesAuthService().TrySilentSignInAsync();
+            Debug.Log("[GPGS] Initial sign-in selected");
+            accountChoice.SetBusy(true, "Signing in...");
+            AccountLinkState auth = await new GooglePlayGamesAuthService().SignInAsync();
             if (!auth.success || string.IsNullOrWhiteSpace(auth.providerUserId))
             {
-                Debug.LogWarning($"[Profile] Resolve failed, fallback to local profile flow. reason={auth.message}");
+                Debug.LogWarning($"[Profile] Resolve Google Play profile skipped. reason={auth.message}");
+                accountChoice.SetBusy(false, string.IsNullOrWhiteSpace(auth.message) ? "Google Play sign-in failed." : auth.message);
                 layout.gameObject.SetActive(false);
-                profileSetup.SetVisible(true);
+                profileSetup.SetVisible(false);
                 return;
             }
 
             if (profileApiClient == null || !profileApiClient.HasServerUrl)
             {
-                Debug.LogWarning("[Profile] Resolve failed, fallback to local profile flow. reason=Server URL is empty.");
+                Debug.LogWarning("[Profile] Resolve Google Play profile failed. reason=Server URL is empty.");
                 profileSetup.SetGooglePlayContext(auth.providerUserId, auth.displayName);
+                accountChoice.SetVisible(false);
                 layout.gameObject.SetActive(false);
                 profileSetup.SetVisible(true);
                 return;
             }
 
-            Debug.Log("[Profile] Resolve by Google Play start");
+            accountChoice.SetBusy(true, "Checking profile...");
+            Debug.Log("[Profile] Resolve Google Play profile start");
             GooglePlayProfileResolveResult resolve = await profileApiClient.ResolveGooglePlayProfileAsync(auth.providerUserId);
             if (!resolve.success)
             {
-                Debug.LogWarning($"[Profile] Resolve failed, fallback to local profile flow. status={resolve.statusCode} message={resolve.message}");
+                Debug.LogWarning($"[Profile] Resolve Google Play profile failed. status={resolve.statusCode} message={resolve.message}");
+                accountChoice.SetBusy(false, string.IsNullOrWhiteSpace(resolve.message) ? "Could not check Google Play profile." : resolve.message);
                 profileSetup.SetGooglePlayContext(auth.providerUserId, auth.displayName);
                 layout.gameObject.SetActive(false);
-                profileSetup.SetVisible(true);
+                profileSetup.SetVisible(false);
                 return;
             }
 
             if (!resolve.found || resolve.profile == null)
             {
-                Debug.Log("[Profile] No Google Play profile found, show profile setup");
+                Debug.Log("[Profile] Google Play profile not found. Show nickname setup.");
                 profileSetup.SetGooglePlayContext(auth.providerUserId, auth.displayName);
+                accountChoice.SetVisible(false);
                 layout.gameObject.SetActive(false);
                 profileSetup.SetVisible(true);
                 return;
             }
 
+            Debug.Log($"[Profile] Google Play resolve success serverProfileId={MaskId(resolve.profile.profileId)} serverNickname={resolve.profile.nickname}");
             if (profileStore.Exists())
             {
                 profileStore.SyncAppSettings(settingsStore);
                 layout.gameObject.SetActive(true);
+                accountChoice.SetVisible(false);
                 profileSetup.SetVisible(false);
                 return;
             }
@@ -605,17 +643,67 @@ namespace CubeChallenge3D.UI
                 auth.displayName);
             if (restored == null)
             {
-                Debug.LogWarning("[Profile] Resolve failed, fallback to local profile flow. reason=Could not save restored profile.");
+                Debug.LogWarning("[Profile] Resolve Google Play profile failed. reason=Could not save restored profile.");
+                accountChoice.SetBusy(false, "Could not save restored profile.");
                 profileSetup.SetGooglePlayContext(auth.providerUserId, auth.displayName);
                 layout.gameObject.SetActive(false);
-                profileSetup.SetVisible(true);
+                profileSetup.SetVisible(false);
                 return;
             }
 
             profileStore.SyncAppSettings(settingsStore);
-            Debug.Log($"[Profile] Existing Google Play profile found nickname={restored.nickname}");
+            Debug.Log($"[Profile] Google Play profile found nickname={restored.nickname}");
+            accountChoice.SetVisible(false);
             profileSetup.SetVisible(false);
             layout.gameObject.SetActive(true);
+        }
+
+        private static async Task RefreshLinkedGooglePlayProfileAsync(
+            PlayerProfileStore profileStore,
+            SettingsStore settingsStore,
+            PlayerProfileApiClient profileApiClient)
+        {
+            if (profileStore == null || settingsStore == null || profileApiClient == null || !profileStore.Exists())
+            {
+                return;
+            }
+
+            AccountLinkState auth = await new GooglePlayGamesAuthService().TrySilentSignInAsync();
+            if (!auth.success || string.IsNullOrWhiteSpace(auth.providerUserId))
+            {
+                Debug.LogWarning($"[Profile] Linked Google Play refresh skipped. reason={auth.message}");
+                return;
+            }
+
+            if (!profileApiClient.HasServerUrl)
+            {
+                Debug.LogWarning("[Profile] Linked Google Play refresh skipped. reason=Server URL is empty.");
+                return;
+            }
+
+            Debug.Log("[Profile] Resolve Google Play profile start");
+            GooglePlayProfileResolveResult resolve = await profileApiClient.ResolveGooglePlayProfileAsync(auth.providerUserId);
+            if (!resolve.success || !resolve.found || resolve.profile == null)
+            {
+                Debug.LogWarning($"[Profile] Linked Google Play refresh skipped. status={resolve.statusCode} message={resolve.message}");
+                return;
+            }
+
+            Debug.Log($"[Profile] Google Play resolve success serverProfileId={MaskId(resolve.profile.profileId)} serverNickname={resolve.profile.nickname}");
+            PlayerProfile current = profileStore.Current;
+            if (current == null || resolve.profile.profileId != current.profileId)
+            {
+                Debug.LogWarning("[Profile] Linked Google Play refresh conflict. Keep local profile.");
+                Debug.LogWarning($"[Profile] Resolve profile compare localProfileId={MaskId(current?.profileId)} serverProfileId={MaskId(resolve.profile.profileId)}");
+                return;
+            }
+
+            profileStore.UpdateGooglePlayLink(
+                FirstNonEmpty(resolve.profile.googlePlayGamesPlayerId, resolve.profile.googlePlayPlayerId, auth.providerUserId),
+                auth.displayName,
+                string.Empty);
+            profileStore.SyncAppSettings(settingsStore);
+            Debug.Log($"[Profile] Linked Google Play profile refreshed nickname={current.nickname}");
         }
 
         private static string FirstNonEmpty(params string[] values)
@@ -634,6 +722,22 @@ namespace CubeChallenge3D.UI
             }
 
             return string.Empty;
+        }
+
+        private static string MaskId(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return "(empty)";
+            }
+
+            string trimmed = value.Trim();
+            if (trimmed.Length <= 6)
+            {
+                return "***";
+            }
+
+            return $"{trimmed.Substring(0, 3)}***{trimmed.Substring(trimmed.Length - 3)}";
         }
 
         private static string GetMenuSubtitle(string key)

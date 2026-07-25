@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using CubeChallenge3D.Save.Settings;
 using UnityEngine;
 
@@ -9,8 +10,13 @@ namespace CubeChallenge3D.Save.Profile
         private const string FileName = "player_profile.json";
         public const int MaxNicknameChangeTickets = 3;
 
+        private static int globalVersion;
         private PlayerProfile current;
         private bool loaded;
+        private int loadedVersion = -1;
+
+        public static event Action Changed;
+        public static event Action<int> NicknameTicketsChanged;
 
         public string ProfilePath => SaveService.GetPath(FileName);
 
@@ -30,13 +36,20 @@ namespace CubeChallenge3D.Save.Profile
 
         public PlayerProfile Load()
         {
-            if (loaded)
+            if (loaded && loadedVersion == globalVersion)
             {
                 return current;
             }
 
+            bool primaryFileExists = File.Exists(ProfilePath);
+            bool backupFileExists = File.Exists(ProfilePath + ".bak");
+            Debug.Log($"[ProfileFlow] persistentDataPath={Application.persistentDataPath}");
+            Debug.Log($"[ProfileFlow] local profile file exists={primaryFileExists}");
+            Debug.Log($"[ProfileFlow] local profile backup exists={backupFileExists}");
+            Debug.Log("[ProfileFlow] PlayerPrefs profile keys exist=false");
             current = SaveService.LoadJson<PlayerProfile>(FileName, null);
             loaded = true;
+            loadedVersion = globalVersion;
             Debug.Log($"[PlayerProfile] Exists={current != null} path={ProfilePath}");
             if (current != null && Normalize(current))
             {
@@ -45,6 +58,7 @@ namespace CubeChallenge3D.Save.Profile
 
             if (current != null)
             {
+                Debug.Log($"[ProfileFlow] local profile loaded profileId={MaskId(current.profileId)}, nickname={current.nickname}, isGooglePlayLinked={current.linkedGooglePlay}, googlePlayGamesPlayerId={MaskId(current.googlePlayPlayerId)}");
                 Debug.Log($"[PlayerProfile] Loaded profileId={current.profileId} nickname={current.nickname} avatarId={current.avatarId}");
             }
 
@@ -200,6 +214,7 @@ namespace CubeChallenge3D.Save.Profile
             Current.updatedAtUtc = DateTime.UtcNow.ToString("o");
             Current.serverSyncPending = true;
             Save();
+            NotifyNicknameTicketsChanged();
             message = "Nickname changed successfully.";
             return true;
         }
@@ -221,6 +236,7 @@ namespace CubeChallenge3D.Save.Profile
             Current.updatedAtUtc = DateTime.UtcNow.ToString("o");
             Save();
             Debug.Log($"[PlayerProfile] Added nickname tickets count={count} total={Current.nicknameChangeTickets}");
+            NotifyNicknameTicketsChanged();
             return true;
         }
 
@@ -311,6 +327,16 @@ namespace CubeChallenge3D.Save.Profile
 
             Normalize(current);
             SaveService.SaveJson(FileName, current);
+            globalVersion++;
+            loadedVersion = globalVersion;
+            Changed?.Invoke();
+        }
+
+        private void NotifyNicknameTicketsChanged()
+        {
+            int count = Current != null ? Math.Max(0, Current.nicknameChangeTickets) : 0;
+            Debug.Log($"[Inventory] NicknameChangeTicket changed count={count}");
+            NicknameTicketsChanged?.Invoke(count);
         }
 
         private static bool Normalize(PlayerProfile profile)
@@ -450,6 +476,22 @@ namespace CubeChallenge3D.Save.Profile
         private static int ClampAvatarId(int avatarId)
         {
             return Math.Max(0, Math.Min(3, avatarId));
+        }
+
+        private static string MaskId(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return "(empty)";
+            }
+
+            string trimmed = value.Trim();
+            if (trimmed.Length <= 6)
+            {
+                return "***";
+            }
+
+            return $"{trimmed.Substring(0, 3)}***{trimmed.Substring(trimmed.Length - 3)}";
         }
 
         private static bool WasNicknameChangedToday(string utcTimestamp)

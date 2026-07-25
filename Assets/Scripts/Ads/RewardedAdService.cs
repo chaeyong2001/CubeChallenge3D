@@ -99,6 +99,23 @@ namespace CubeChallenge3D.Ads
                 && provider.IsReady(placement);
         }
 
+        public bool CanRequest(RewardedAdPlacement placement)
+        {
+            return IsPlacementAvailable(placement)
+                && !isShowingAd
+                && !IsLimitReached(placement);
+        }
+
+        public void EnsureLoaded(RewardedAdPlacement placement)
+        {
+            if (!IsPlacementAvailable(placement) || IsLimitReached(placement) || provider.IsReady(placement))
+            {
+                return;
+            }
+
+            provider.LoadRewardedAd(placement);
+        }
+
         public int GetRemaining(RewardedAdPlacement placement)
         {
             if (placement == RewardedAdPlacement.DailyCoins)
@@ -141,6 +158,7 @@ namespace CubeChallenge3D.Ads
             }
             if (!provider.IsReady(placement))
             {
+                provider.LoadRewardedAd(placement);
                 onCompleted?.Invoke(RewardedAdResult.NotReady);
                 return;
             }

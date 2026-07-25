@@ -201,7 +201,8 @@ namespace CubeChallenge3D.Networking
                 profileId = profileId,
                 nickname = nickname,
                 avatarId = avatarId,
-                googlePlayPlayerId = googlePlayGamesPlayerId
+                googlePlayPlayerId = googlePlayGamesPlayerId,
+                googlePlayGamesPlayerId = googlePlayGamesPlayerId
             };
             string json = JsonUtility.ToJson(payload);
             byte[] body = Encoding.UTF8.GetBytes(json);
@@ -511,6 +512,7 @@ namespace CubeChallenge3D.Networking
         public string nickname;
         public int avatarId;
         public string googlePlayPlayerId;
+        public string googlePlayGamesPlayerId;
     }
 
     [Serializable]

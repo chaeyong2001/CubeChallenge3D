@@ -2809,6 +2809,11 @@ namespace CubeChallenge3D.UI.Game
 
         private static string FormatRankLabel(int rank)
         {
+            if (rank > 999)
+            {
+                return "???";
+            }
+
             int mod100 = rank % 100;
             if (mod100 >= 11 && mod100 <= 13)
             {

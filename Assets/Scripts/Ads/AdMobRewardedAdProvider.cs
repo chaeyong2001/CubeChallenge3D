@@ -120,6 +120,11 @@ namespace CubeChallenge3D.Ads
 #endif
         }
 
+        public void LoadRewardedAd(RewardedAdPlacement placement)
+        {
+            Load(placement);
+        }
+
         private void PreloadAll()
         {
             foreach (RewardedAdPlacement placement in Enum.GetValues(typeof(RewardedAdPlacement)))

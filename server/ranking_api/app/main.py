@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.database import init_db
-from app.routers import challenge, health, players, ranking, stage_records
+from app.routers import challenge, health, iap, players, ranking, stage_records
 
 
 app = FastAPI(title="CubeChallenge3D Ranking API", version="0.1.0")
@@ -28,3 +28,4 @@ app.include_router(challenge.router)
 app.include_router(ranking.router)
 app.include_router(stage_records.router)
 app.include_router(players.router)
+app.include_router(iap.router)

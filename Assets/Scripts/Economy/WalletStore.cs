@@ -1,5 +1,6 @@
 using System;
 using CubeChallenge3D.Save;
+using UnityEngine;
 
 namespace CubeChallenge3D.Economy
 {
@@ -11,6 +12,7 @@ namespace CubeChallenge3D.Economy
         private EconomyWallet wallet;
 
         public static event Action Changed;
+        public static event Action<string, int> CurrencyChanged;
 
         public int Coins => ReloadAndRefresh().coins;
         public int Gems => ReloadAndRefresh().gems;
@@ -36,14 +38,14 @@ namespace CubeChallenge3D.Economy
         {
             EconomyWallet data = ReloadAndRefresh();
             data.coins = ClampCurrency((long)data.coins + amount);
-            Save();
+            Save("coins", data.coins);
         }
 
         public void AddGems(int amount)
         {
             EconomyWallet data = ReloadAndRefresh();
             data.gems = ClampCurrency((long)data.gems + amount);
-            Save();
+            Save("gems", data.gems);
         }
 
         public void AddHearts(int amount)
@@ -59,7 +61,7 @@ namespace CubeChallenge3D.Economy
             {
                 data.lastHeartRegenTimeUtc = DateTime.UtcNow.ToString("o");
             }
-            Save();
+            Save("hearts", data.hearts);
         }
 
         public bool SpendCoins(int amount)
@@ -71,7 +73,7 @@ namespace CubeChallenge3D.Economy
             }
 
             data.coins -= amount;
-            Save();
+            Save("coins", data.coins);
             return true;
         }
 
@@ -84,7 +86,7 @@ namespace CubeChallenge3D.Economy
             }
 
             data.gems -= amount;
-            Save();
+            Save("gems", data.gems);
             return true;
         }
 
@@ -102,7 +104,7 @@ namespace CubeChallenge3D.Economy
             {
                 data.lastHeartRegenTimeUtc = DateTime.UtcNow.ToString("o");
             }
-            Save();
+            Save("hearts", data.hearts);
             return true;
         }
 
@@ -112,7 +114,7 @@ namespace CubeChallenge3D.Economy
             bool changed = ApplyHeartRegen(wallet, DateTime.UtcNow);
             if (changed)
             {
-                Save();
+                Save("hearts", wallet.hearts);
             }
             return changed;
         }
@@ -151,11 +153,18 @@ namespace CubeChallenge3D.Economy
             return wallet;
         }
 
-        private void Save()
+        private void Save(string currencyId = null, int value = 0)
         {
             SaveDataValidator.Normalize(Data);
             SaveService.SaveJson(FileName, Data);
+            if (!string.IsNullOrWhiteSpace(currencyId))
+            {
+                CurrencyChanged?.Invoke(currencyId, value);
+                Debug.Log($"[Wallet] Currency changed currency={currencyId} count={value}");
+            }
+
             Changed?.Invoke();
+            Debug.Log("[Wallet] WalletChanged event raised");
         }
 
         private static bool ApplyHeartRegen(EconomyWallet data, DateTime utcNow)
