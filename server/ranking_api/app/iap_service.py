@@ -11,6 +11,7 @@ from app.google_play_api import GooglePlayApiError, GooglePlayDeveloperApi
 from app.iap_products import IapProductConfig, get_product
 from app.player_service import PlayerProfileError, get_profile_by_id
 from app.schemas import (
+    IapGemSpendResponse,
     IapGoogleVerifyRequest,
     IapGoogleVerifyResponse,
     IapProfileStateResponse,
@@ -46,6 +47,8 @@ def verify_google_purchase(
 
     token_hash = hash_purchase_token(payload.purchaseToken)
     existing = get_purchase_by_token_hash(db, token_hash)
+    if existing is not None and existing.status in {"voided", "revoked"}:
+        raise IapError(409, "PURCHASE_REVOKED", "Purchase was already voided or revoked.")
     if existing is not None and existing.status in {"granted", "consumed", "acknowledged"}:
         return _build_verify_response(db, existing, already_granted=True, message="Purchase already granted.")
 
@@ -79,6 +82,11 @@ def verify_google_purchase(
     purchase.order_id = payload.orderId or google_purchase.order_id or purchase.order_id
     purchase.granted_currency_type = product.grant_currency_type
     purchase.granted_amount = product.grant_amount
+    if product.grant_currency_type == "gems":
+        purchase.granted_gems = purchase.granted_gems or product.grant_amount
+        purchase.remaining_gems = purchase.remaining_gems or product.grant_amount
+        purchase.used_gems = purchase.used_gems or 0
+        purchase.refundable_status = calculate_refundable_status(purchase)
     purchase.entitlement_key = product.entitlement_key
     purchase.raw_google_response = json.dumps(google_purchase.raw, ensure_ascii=False)
     purchase.updated_at = now
@@ -122,6 +130,62 @@ def get_entitlements(db: Session, profile_id: str) -> IapProfileStateResponse:
     entitlement = get_or_create_entitlement(db, profile.profile_id)
     db.commit()
     return to_profile_state(entitlement)
+
+
+def spend_paid_gems(db: Session, profile_id: str, amount: int, reason: str = "") -> IapGemSpendResponse:
+    profile = get_profile_by_id(db, profile_id)
+    if profile is None:
+        raise PlayerProfileError(404, "not_found", "Player profile was not found.")
+
+    if amount <= 0:
+        raise IapError(400, "INVALID_GEM_SPEND", "amount must be greater than zero.")
+
+    entitlement = get_or_create_entitlement(db, profile.profile_id)
+    remaining_to_spend = amount
+    paid_used = 0
+    grants = (
+        db.query(models.IapPurchase)
+        .filter(
+            models.IapPurchase.profile_id == profile.profile_id,
+            models.IapPurchase.granted_currency_type == "gems",
+            models.IapPurchase.remaining_gems > 0,
+            models.IapPurchase.status != "revoked",
+        )
+        .order_by(models.IapPurchase.granted_at.asc(), models.IapPurchase.created_at.asc(), models.IapPurchase.id.asc())
+        .all()
+    )
+
+    now = datetime.utcnow()
+    for grant in grants:
+        if remaining_to_spend <= 0:
+            break
+
+        take = min(remaining_to_spend, max(0, grant.remaining_gems))
+        if take <= 0:
+            continue
+
+        grant.remaining_gems -= take
+        grant.used_gems += take
+        grant.refundable_status = calculate_refundable_status(grant)
+        grant.updated_at = now
+        paid_used += take
+        remaining_to_spend -= take
+
+    if paid_used > 0:
+        entitlement.gems = max(0, entitlement.gems - paid_used)
+        entitlement.updated_at = now
+
+    db.commit()
+    return IapGemSpendResponse(
+        success=True,
+        profileId=profile.profile_id,
+        requestedAmount=amount,
+        paidGemsUsed=paid_used,
+        untrackedGemsUsed=remaining_to_spend,
+        remainingPaidGems=entitlement.gems,
+        refundDebtGems=entitlement.refund_debt_gems,
+        message="Paid gem ledger updated." if paid_used > 0 else "No paid gems were available in the ledger.",
+    )
 
 
 def sync_voided_purchases(db: Session, admin_secret: str, google_api: GooglePlayDeveloperApi | None = None) -> IapVoidedPurchasesSyncResponse:
@@ -192,6 +256,10 @@ def grant_product(
 
     if product.grant_currency_type == "gems":
         entitlement.gems += product.grant_amount
+        purchase.granted_gems = product.grant_amount
+        purchase.remaining_gems = product.grant_amount
+        purchase.used_gems = 0
+        purchase.refundable_status = "unused"
     elif product.entitlement_key == "remove_ads":
         entitlement.remove_ads_purchased = True
 
@@ -207,10 +275,16 @@ def apply_revocation(db: Session, purchase: models.IapPurchase, reason: str) -> 
 
     if purchase.granted_currency_type == "gems" and purchase.granted_amount > 0:
         action_type = "subtract_currency"
-        amount = purchase.granted_amount
-        entitlement.gems = max(0, entitlement.gems - amount)
-        if before < amount:
-            entitlement.refund_debt_gems += amount - before
+        reclaimable = max(0, purchase.remaining_gems)
+        used = max(0, purchase.used_gems)
+        amount = reclaimable
+        missing_reclaimable = max(0, reclaimable - before)
+        entitlement.gems = max(0, entitlement.gems - reclaimable)
+        if used > 0 or missing_reclaimable > 0:
+            entitlement.refund_debt_gems += used + missing_reclaimable
+        purchase.remaining_gems = 0
+        purchase.used_gems = max(purchase.used_gems, max(0, purchase.granted_gems))
+        purchase.refundable_status = "revoked"
     elif purchase.entitlement_key == "remove_ads":
         action_type = "revoke_entitlement"
         entitlement.remove_ads_purchased = False
@@ -257,6 +331,18 @@ def mask_token(value: str) -> str:
     return f"{value[:4]}***{value[-4:]}"
 
 
+def calculate_refundable_status(purchase: models.IapPurchase) -> str:
+    if purchase.status == "revoked":
+        return "revoked"
+    if purchase.status == "voided":
+        return "voided"
+    if purchase.used_gems <= 0:
+        return "unused"
+    if purchase.remaining_gems <= 0:
+        return "fully_used"
+    return "partially_used"
+
+
 def _build_verify_response(
     db: Session,
     purchase: models.IapPurchase,
@@ -274,6 +360,10 @@ def _build_verify_response(
             productType=purchase.product_type,
             grantedCurrencyType=purchase.granted_currency_type,
             grantedAmount=purchase.granted_amount,
+            grantedGems=purchase.granted_gems,
+            remainingGems=purchase.remaining_gems,
+            usedGems=purchase.used_gems,
+            refundableStatus=purchase.refundable_status,
         ),
         message=message,
     )

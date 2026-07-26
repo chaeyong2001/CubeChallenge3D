@@ -46,6 +46,7 @@ namespace CubeChallenge3D.IAP
             }
 
 #if !UNITY_EDITOR
+            WalletStore.GemsSpent += HandleGemsSpent;
             _ = SyncServerEntitlementsAsync();
             InitializeBilling();
 #endif
@@ -379,6 +380,29 @@ namespace CubeChallenge3D.IAP
             }
 
             Debug.Log($"[IAP] Entitlement sync success profileId={profile.profileId} removeAdsPurchased={result.profile.removeAdsPurchased} refundDebtGems={result.profile.refundDebtGems}");
+        }
+
+        private async void HandleGemsSpent(int amount)
+        {
+            if (amount <= 0 || !iapApiClient.HasServerUrl)
+            {
+                return;
+            }
+
+            PlayerProfile profile = profileStore.Current;
+            if (profile == null || string.IsNullOrWhiteSpace(profile.profileId))
+            {
+                return;
+            }
+
+            IapGemSpendResult result = await iapApiClient.ReportGemSpendAsync(profile.profileId, amount, "local_gem_spend");
+            if (!result.success || result.response == null)
+            {
+                Debug.LogWarning($"[IAP] Paid gem ledger spend report failed amount={amount} message={result.message}");
+                return;
+            }
+
+            Debug.Log($"[IAP] Paid gem ledger spend reported amount={amount} paidUsed={result.response.paidGemsUsed} untracked={result.response.untrackedGemsUsed} remainingPaid={result.response.remainingPaidGems}");
         }
 
         private async Task<PromotionPurchaseResult> VerifyAndApplyPurchasedProductAsync(string productId, Order order, bool restoreOnly)

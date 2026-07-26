@@ -13,6 +13,7 @@ namespace CubeChallenge3D.Economy
 
         public static event Action Changed;
         public static event Action<string, int> CurrencyChanged;
+        public static event Action<int> GemsSpent;
 
         public int Coins => ReloadAndRefresh().coins;
         public int Gems => ReloadAndRefresh().gems;
@@ -87,6 +88,7 @@ namespace CubeChallenge3D.Economy
 
             data.gems -= amount;
             Save("gems", data.gems);
+            GemsSpent?.Invoke(amount);
             return true;
         }
 

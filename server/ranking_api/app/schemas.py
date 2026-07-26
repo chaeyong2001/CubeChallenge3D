@@ -277,6 +277,23 @@ class IapVoidedPurchasesSyncRequest(BaseModel):
     adminSecret: str = ""
 
 
+class IapGemSpendRequest(BaseModel):
+    profileId: str = Field(..., min_length=1, max_length=120)
+    amount: int = Field(..., ge=1)
+    reason: str = Field("", max_length=80)
+
+
+class IapGemSpendResponse(BaseModel):
+    success: bool
+    profileId: str
+    requestedAmount: int
+    paidGemsUsed: int = 0
+    untrackedGemsUsed: int = 0
+    remainingPaidGems: int = 0
+    refundDebtGems: int = 0
+    message: str = ""
+
+
 class IapProfileStateResponse(BaseModel):
     profileId: str
     gems: int = 0
@@ -291,6 +308,10 @@ class IapPurchaseResponse(BaseModel):
     productType: str = ""
     grantedCurrencyType: Optional[str] = None
     grantedAmount: int = 0
+    grantedGems: int = 0
+    remainingGems: int = 0
+    usedGems: int = 0
+    refundableStatus: str = "unused"
 
 
 class IapGoogleVerifyResponse(BaseModel):

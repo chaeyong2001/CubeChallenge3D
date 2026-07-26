@@ -111,6 +111,50 @@ namespace CubeChallenge3D.IAP
             }
         }
 
+        public async Task<IapGemSpendResult> ReportGemSpendAsync(string profileId, int amount, string reason)
+        {
+            if (!HasServerUrl)
+            {
+                return IapGemSpendResult.Unavailable("Server URL is empty.");
+            }
+
+            IapGemSpendRequestDto payload = new IapGemSpendRequestDto
+            {
+                profileId = profileId,
+                amount = amount,
+                reason = reason ?? string.Empty
+            };
+            byte[] body = Encoding.UTF8.GetBytes(JsonUtility.ToJson(payload));
+            using (UnityWebRequest request = new UnityWebRequest($"{baseUrl}/iap/gems/spend", UnityWebRequest.kHttpVerbPOST))
+            {
+                request.uploadHandler = new UploadHandlerRaw(body);
+                request.downloadHandler = new DownloadHandlerBuffer();
+                request.timeout = timeoutSeconds;
+                request.SetRequestHeader("Content-Type", "application/json");
+                await WaitForRequestAsync(request.SendWebRequest());
+
+                if (HasConnectionError(request))
+                {
+                    return IapGemSpendResult.Unavailable(request.error);
+                }
+
+                if (HasProtocolError(request))
+                {
+                    return IapGemSpendResult.Failed(request.error, request.responseCode);
+                }
+
+                IapGemSpendResponseDto response = JsonUtility.FromJson<IapGemSpendResponseDto>(request.downloadHandler.text);
+                return new IapGemSpendResult
+                {
+                    requestSucceeded = true,
+                    success = response != null && response.success,
+                    statusCode = request.responseCode,
+                    message = response != null ? response.message : "Invalid gem spend response.",
+                    response = response
+                };
+            }
+        }
+
         private static bool HasConnectionError(UnityWebRequest request)
         {
 #if UNITY_2020_2_OR_NEWER
@@ -171,6 +215,27 @@ namespace CubeChallenge3D.IAP
     }
 
     [Serializable]
+    public sealed class IapGemSpendRequestDto
+    {
+        public string profileId;
+        public int amount;
+        public string reason;
+    }
+
+    [Serializable]
+    public sealed class IapGemSpendResponseDto
+    {
+        public bool success;
+        public string profileId;
+        public int requestedAmount;
+        public int paidGemsUsed;
+        public int untrackedGemsUsed;
+        public int remainingPaidGems;
+        public int refundDebtGems;
+        public string message;
+    }
+
+    [Serializable]
     public sealed class IapPurchaseDto
     {
         public string productId;
@@ -223,6 +288,25 @@ namespace CubeChallenge3D.IAP
         public static IapEntitlementsResult Failed(string message, long statusCode)
         {
             return new IapEntitlementsResult { requestSucceeded = true, success = false, statusCode = statusCode, message = message };
+        }
+    }
+
+    public sealed class IapGemSpendResult
+    {
+        public bool requestSucceeded;
+        public bool success;
+        public long statusCode;
+        public string message;
+        public IapGemSpendResponseDto response;
+
+        public static IapGemSpendResult Unavailable(string message)
+        {
+            return new IapGemSpendResult { requestSucceeded = false, success = false, message = message };
+        }
+
+        public static IapGemSpendResult Failed(string message, long statusCode)
+        {
+            return new IapGemSpendResult { requestSucceeded = true, success = false, statusCode = statusCode, message = message };
         }
     }
 }

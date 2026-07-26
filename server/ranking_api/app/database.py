@@ -49,3 +49,14 @@ def ensure_runtime_columns() -> None:
                 connection.execute(text("ALTER TABLE player_profiles ADD COLUMN google_account_id VARCHAR(160)"))
             if "google_email_hash" not in profile_columns:
                 connection.execute(text("ALTER TABLE player_profiles ADD COLUMN google_email_hash VARCHAR(160)"))
+
+        if "iap_purchases" in table_names:
+            iap_columns = {column["name"] for column in inspector.get_columns("iap_purchases")}
+            if "granted_gems" not in iap_columns:
+                connection.execute(text("ALTER TABLE iap_purchases ADD COLUMN granted_gems INTEGER NOT NULL DEFAULT 0"))
+            if "remaining_gems" not in iap_columns:
+                connection.execute(text("ALTER TABLE iap_purchases ADD COLUMN remaining_gems INTEGER NOT NULL DEFAULT 0"))
+            if "used_gems" not in iap_columns:
+                connection.execute(text("ALTER TABLE iap_purchases ADD COLUMN used_gems INTEGER NOT NULL DEFAULT 0"))
+            if "refundable_status" not in iap_columns:
+                connection.execute(text("ALTER TABLE iap_purchases ADD COLUMN refundable_status VARCHAR(32) NOT NULL DEFAULT 'unused'"))

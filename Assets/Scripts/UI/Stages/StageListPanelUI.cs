@@ -26,6 +26,7 @@ namespace CubeChallenge3D.UI.Stages
         private const int HeartAdDailyLimit = 6;
         private const int HeartAdBatchLimit = 3;
         private const float HeartAdBatchCooldownMinutes = 60f;
+        private const string BlockChipAttentionSeenKey = "CubeChallenge3D.Stage.BlockChipAttentionSeen";
         private static readonly Vector2 BlockRewardCardSize = new Vector2(949f, 230f);
         private const float BlockRewardCardStride = 256f;
         private static readonly Vector2 DefaultMarkerOffset = new Vector2(0f, 92f);
@@ -111,6 +112,7 @@ namespace CubeChallenge3D.UI.Stages
         private RectTransform blockRewardsContent;
         private Button mapRewardsButton;
         private RewardsButtonAttention mapRewardsAttention;
+        private RewardsButtonAttention mapBlockAttention;
         private Action shopAction;
         private bool mapUsesArtBackground;
         private StageSlotLayoutConfig slotLayoutConfig;
@@ -190,14 +192,36 @@ namespace CubeChallenge3D.UI.Stages
 
         public void Hide()
         {
+            CloseStageMapPopups();
             StopHeartPopupCountdown();
             root.SetActive(false);
         }
 
         private void ShowModeSelect()
         {
+            CloseStageMapPopups();
             modeSelectRoot.gameObject.SetActive(true);
             mapRoot.gameObject.SetActive(false);
+        }
+
+        private void CloseStageMapPopups()
+        {
+            if (blockSelectorPopup != null)
+            {
+                blockSelectorPopup.SetActive(false);
+            }
+
+            if (blockRewardsPopup != null)
+            {
+                blockRewardsPopup.SetActive(false);
+            }
+
+            if (heartPopup != null)
+            {
+                heartPopup.SetActive(false);
+            }
+
+            StopHeartPopupCountdown();
         }
 
         private void ShowMap(StageType type)
@@ -348,7 +372,8 @@ namespace CubeChallenge3D.UI.Stages
             Button blockButton = blockChip.gameObject.AddComponent<Button>();
             blockButton.transition = Selectable.Transition.None;
             blockChip.GetComponent<Image>().raycastTarget = true;
-            blockButton.onClick.AddListener(ShowBlockSelectorPopup);
+            mapBlockAttention = blockChip.gameObject.AddComponent<RewardsButtonAttention>();
+            blockButton.onClick.AddListener(HandleBlockChipClicked);
 
             RectTransform scene = CreatePanel(mapRoot, "StageMapScene", new Color(0.17f, 0.44f, 0.86f, 0.32f), 36, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 198f), new Vector2(1080f, 1260f));
             scene.pivot = new Vector2(0.5f, 0f);
@@ -452,6 +477,7 @@ namespace CubeChallenge3D.UI.Stages
 #endif
                 RefreshBlockBrowseView(modeStages, currentLocal, highestClearedLocal);
                 RefreshRewardsButtonAttention();
+                RefreshBlockChipAttention();
                 return;
             }
 
@@ -465,6 +491,7 @@ namespace CubeChallenge3D.UI.Stages
 #endif
             BuildMapNodes(modeStages, currentLocal, highestClearedLocal);
             RefreshRewardsButtonAttention();
+            RefreshBlockChipAttention();
         }
 
         private void BuildMapNodes(IReadOnlyList<StageData> modeStages, int currentLocal, int highestClearedLocal)
@@ -2660,6 +2687,31 @@ namespace CubeChallenge3D.UI.Stages
             PopulateBlockSelectorPopup();
             blockSelectorPopup.SetActive(true);
             blockSelectorPopup.transform.SetAsLastSibling();
+        }
+
+        private void HandleBlockChipClicked()
+        {
+            if (PlayerPrefs.GetInt(BlockChipAttentionSeenKey, 0) == 0)
+            {
+                PlayerPrefs.SetInt(BlockChipAttentionSeenKey, 1);
+                PlayerPrefs.Save();
+                RefreshBlockChipAttention();
+            }
+
+            ShowBlockSelectorPopup();
+        }
+
+        private void RefreshBlockChipAttention()
+        {
+            if (mapBlockAttention == null)
+            {
+                return;
+            }
+
+            bool shouldShow = mapRoot != null
+                && mapRoot.gameObject.activeInHierarchy
+                && PlayerPrefs.GetInt(BlockChipAttentionSeenKey, 0) == 0;
+            mapBlockAttention.SetActive(shouldShow);
         }
 
         private void PopulateBlockSelectorPopup()

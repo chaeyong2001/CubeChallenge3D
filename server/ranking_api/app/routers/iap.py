@@ -2,12 +2,14 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.iap_service import IapError, get_entitlements, sync_voided_purchases, verify_google_purchase
+from app.iap_service import IapError, get_entitlements, spend_paid_gems, sync_voided_purchases, verify_google_purchase
 from app.player_service import PlayerProfileError
 from app.schemas import (
     IapGoogleRestoreRequest,
     IapGoogleVerifyRequest,
     IapGoogleVerifyResponse,
+    IapGemSpendRequest,
+    IapGemSpendResponse,
     IapProfileStateResponse,
     IapVoidedPurchasesSyncRequest,
     IapVoidedPurchasesSyncResponse,
@@ -74,6 +76,14 @@ def sync_google_voided_purchases(
     try:
         return sync_voided_purchases(db, payload.adminSecret, None)
     except IapError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.message) from exc
+
+
+@router.post("/gems/spend", response_model=IapGemSpendResponse)
+def spend_iap_gems(payload: IapGemSpendRequest, db: Session = Depends(get_db)):
+    try:
+        return spend_paid_gems(db, payload.profileId, payload.amount, payload.reason)
+    except (IapError, PlayerProfileError) as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.message) from exc
 
 
